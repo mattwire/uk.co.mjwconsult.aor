@@ -122,30 +122,136 @@ function aor_civicrm_alterSettingsFolders(&$metaDataFolders = NULL) {
   _aor_civix_civicrm_alterSettingsFolders($metaDataFolders);
 }
 
-// --- Functions below this ship commented out. Uncomment as required. ---
+/**
+ * Alter the display of CPD Tutor custom group tab
+ * @param $content
+ * @param $context
+ * @param $tplName
+ * @param $object
+ */
+function aor_civicrm_alterContent(  &$content, $context, $tplName, &$object ) {
+  if ($object instanceof CRM_Contact_Page_View_CustomData) {
+    $customGroup = cpdtutor_get_custom_group();
+    if ($object->_groupId == $customGroup['id']) {
+      // We are viewing CPD Tutor information
+      // Get the start and end of the table used for display
+      $tableStartIndex = strpos($content, '<table id="records"');
+      $tableEndIndex = strpos($content, '</tr></table>') + 13;
+      $tableContent = substr($content, $tableStartIndex, $tableEndIndex - $tableStartIndex);
+
+      // Now get all Ids
+      $index=0;
+      $membershipIds = array();
+      $courseIdField = cpdcourseid_get_custom_field();
+
+      while ($index !== FALSE) {
+        // Get the api key
+        $apiStart = strpos($tableContent, '&quot;key&quot;:&quot;') + 22;
+        $apiEnd = strpos($tableContent, '&quot;', $apiStart);
+        $apiStr = substr($tableContent, $apiStart, $apiEnd - $apiStart);
+
+        // Get the record id (from "crmf-custom_103_4 ")
+        $needle = 'crmf-custom_' . $courseIdField['id'];
+        $recordIdStart = strpos($tableContent, $needle);
+        if ($recordIdStart === FALSE) {
+          break;
+        }
+        else {
+          $recordIdStart += strlen($needle) + 1;
+        }
+        $tableContent = substr($tableContent, $recordIdStart);
+        $recordIdEnd = strpos($tableContent, ' ');
+        if ($recordIdEnd === FALSE) {
+          break;
+        }
+        $recordId = substr($tableContent, 0, $recordIdEnd);
+
+        $index = strpos($tableContent, 'crm-editable">');
+        if ($index === FALSE) {
+          break;
+        }
+        else {
+          $index += 14;
+        }
+        $tableContent = substr($tableContent, $index);
+        $indexEnd = strpos($tableContent, '</td>');
+        if ($indexEnd === FALSE) {
+          break;
+        }
+        $membershipIds[$recordId] = substr($tableContent, 0, $indexEnd);
+      }
+
+      $courseNameField = cpdcoursename_get_custom_field();
+      $contactId = $object->_contactId;
+
+      $newTable = '<table id="records" class="display"><thead><tr><th>CPD Course</th><th></th></tr></thead>';
+      foreach ($membershipIds as $key => $mId) {
+        $result = civicrm_api3('Membership', 'get', array(
+          'id' => $mId,
+        ));
+        if (!empty($result['is_error'] || empty($result['id']))) {
+          CRM_Core_Session::setStatus('Could not find membership with Id: '. $mId, 'Error');
+          $row = '<tr><td>Unknown ID: ' . $mId . '</td>';
+        }
+        else {
+          $courseName = $result['values'][$mId]['custom_' . $courseNameField['id']];
+          $mContactId = $result['values'][$mId]['contact_id'];
+
+          $url = CRM_Utils_System::url('civicrm/contact/view/membership', "action=view&reset=1&id={$mId}&cid={$mContactId}");
+          $row = '<tr><td><a class="crm-popup" href="' . $url . '">' . $courseName . '</a></td>';
+        }
+        $row .= '<td><a href="#" class="action-item crm-hover-button delete-custom-row" title="Delete CPD Tutor record"'
+                    . 'data-delete_params="{&quot;valueID&quot;:'.$key.',&quot;groupID&quot;:&quot;'.$customGroup['id']
+                    . '&quot;,&quot;contactId&quot;:&quot;'.$contactId.'&quot;'
+                    . ',&quot;key&quot;:&quot;'.$apiStr.'&quot;}">Delete tutor for course</a></td>';
+        $row .= '</tr>';
+        $newTable .= $row;
+      }
+      $newTable .= '</table>';
+
+      $content = substr_replace($content, $newTable, $tableStartIndex, $tableEndIndex - $tableStartIndex);
+    }
+  }
+}
 
 /**
- * Implements hook_civicrm_preProcess().
- *
- * @link http://wiki.civicrm.org/confluence/display/CRMDOC/hook_civicrm_preProcess
- *
-function aor_civicrm_preProcess($formName, &$form) {
-
-} // */
+ * Get the CPD Tutor custom group
+ */
+$_cpdtutor_custom_group = NULL; // static, global variable
+function cpdtutor_get_custom_group()
+{
+  global $_cpdtutor_custom_group;
+  if ($_cpdtutor_custom_group === NULL) {
+    // load custom field data
+    $_cpdtutor_custom_group = civicrm_api3('CustomGroup', 'getsingle', array('name' => "CPD_Tutor"));
+  }
+  return $_cpdtutor_custom_group;
+}
 
 /**
- * Implements hook_civicrm_navigationMenu().
- *
- * @link http://wiki.civicrm.org/confluence/display/CRMDOC/hook_civicrm_navigationMenu
- *
-function aor_civicrm_navigationMenu(&$menu) {
-  _aor_civix_insert_navigation_menu($menu, NULL, array(
-    'label' => ts('The Page', array('domain' => 'uk.co.mjwconsult.aor')),
-    'name' => 'the_page',
-    'url' => 'civicrm/the-page',
-    'permission' => 'access CiviReport,access CiviContribute',
-    'operator' => 'OR',
-    'separator' => 0,
-  ));
-  _aor_civix_navigationMenu($menu);
-} // */
+ * Get the CPD Course name custom field
+ */
+$_cpdcoursename_custom_field = NULL; // static, global variable
+function cpdcoursename_get_custom_field()
+{
+  global $_cpdcoursename_custom_field;
+  if ($_cpdcoursename_custom_field === NULL) {
+    // load custom field data
+    $_cpdcoursename_custom_field = civicrm_api3('CustomField', 'getsingle', array('name' => "Course_name"));
+  }
+  return $_cpdcoursename_custom_field;
+}
+
+/**
+ * Get the CPD Course name custom field
+ */
+$_cpdcourseid_custom_field = NULL; // static, global variable
+function cpdcourseid_get_custom_field()
+{
+  global $_cpdcourseid_custom_field;
+  if ($_cpdcourseid_custom_field === NULL) {
+    // load custom field data
+    $_cpdcourseid_custom_field = civicrm_api3('CustomField', 'getsingle', array('name' => "CPD_Course_ID"));
+  }
+  return $_cpdcourseid_custom_field;
+}
