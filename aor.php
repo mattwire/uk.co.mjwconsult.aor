@@ -136,6 +136,10 @@ function aor_civicrm_alterContent(  &$content, $context, $tplName, &$object ) {
       // We are viewing CPD Tutor information
       // Get the start and end of the table used for display
       $tableStartIndex = strpos($content, '<table id="records"');
+      if ($tableStartIndex === FALSE) {
+        // No entries
+        return;
+      }
       $tableEndIndex = strpos($content, '</tr></table>') + 13;
       $tableContent = substr($content, $tableStartIndex, $tableEndIndex - $tableStartIndex);
 
