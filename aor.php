@@ -130,6 +130,11 @@ function aor_civicrm_alterSettingsFolders(&$metaDataFolders = NULL) {
  * @param $object
  */
 function aor_civicrm_alterContent(  &$content, $context, $tplName, &$object ) {
+  if ($object instanceof CRM_Member_Page_Tab) {
+    $template = CRM_Core_Smarty::singleton();
+    $content .= $template->fetch('CRM/aor/membership.js.tpl');
+  }
+
   if ($object instanceof CRM_Contact_Page_View_CustomData) {
     $customGroup = cpdtutor_get_custom_group();
     if ($object->_groupId == $customGroup['id']) {
@@ -216,6 +221,19 @@ function aor_civicrm_alterContent(  &$content, $context, $tplName, &$object ) {
       $content = substr_replace($content, $newTable, $tableStartIndex, $tableEndIndex - $tableStartIndex);
     }
   }
+}
+
+
+/**
+ * Implements hook_coreResourceList
+ *
+ * @param array $list
+ * @param string $region
+ */
+function aor_civicrm_coreResourceList(&$list, $region) {
+  Civi::resources()
+    ->addStyleFile('uk.co.mjwconsult.aor', 'css/aor.css', 0, 'page-header')
+    ->addScriptFile('uk.co.mjwconsult.aor', 'js/membership.js');
 }
 
 /**
