@@ -1,0 +1,13 @@
+diff --git a/templates/CRM/Price/Form/Calculate.tpl b/templates/CRM/Price/Form/Calculate.tpl
+index 0450dc3..b9e781a 100644
+--- a/templates/CRM/Price/Form/Calculate.tpl
++++ b/templates/CRM/Price/Form/Calculate.tpl
+@@ -176,7 +176,7 @@ function calculateText( object ) {
+        price[ele] = 0;
+    }
+    optionPart = option[1].split(optionSep);
+-   addprice   = parseFloat( optionPart[0] );
++   addprice   = parseFloat( optionPart[0] ).toPrecision(2);
+    var curval  = textval * addprice;
+    if ( textval >= 0 ) {
+        totalfee   = parseFloat(totalfee) + curval - parseFloat(price[ele]);
