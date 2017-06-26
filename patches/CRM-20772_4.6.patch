@@ -1,3 +1,33 @@
+diff --git a/CRM/Price/BAO/LineItem.php b/CRM/Price/BAO/LineItem.php
+index 04dfc78..1f5a0fa 100644
+--- a/CRM/Price/BAO/LineItem.php
++++ b/CRM/Price/BAO/LineItem.php
+@@ -338,7 +338,7 @@ AND li.entity_id = {$entityId}
+         'auto_renew' => CRM_Utils_Array::value('auto_renew', $options[$oid]),
+         'html_type' => $fields['html_type'],
+         'financial_type_id' => CRM_Utils_Array::value('financial_type_id', $options[$oid]),
+-        'tax_amount' => CRM_Utils_Array::value('tax_amount', $options[$oid]),
++        'tax_amount' => round(CRM_Utils_Array::value('tax_amount', $options[$oid]), 2),
+       );
+ 
+       if ($values[$oid]['membership_type_id'] && empty($values[$oid]['auto_renew'])) {
+diff --git a/CRM/Price/BAO/PriceSet.php b/CRM/Price/BAO/PriceSet.php
+index f401d63..8c700c1 100644
+--- a/CRM/Price/BAO/PriceSet.php
++++ b/CRM/Price/BAO/PriceSet.php
+@@ -1538,10 +1538,10 @@ WHERE       ps.id = %1
+   public static function setLineItem($field, $lineItem, $optionValueId) {
+     // Here we round - i.e. after multiplying by quantity
+     if ($field['html_type'] == 'Text') {
+-      $taxAmount = round($field['options'][$optionValueId]['tax_amount'] * $lineItem[$optionValueId]['qty'], 2);
++      $taxAmount = round($lineItem[$optionValueId]['tax_amount'] * $lineItem[$optionValueId]['qty'], 2);
+     }
+     else {
+-      $taxAmount = round($field['options'][$optionValueId]['tax_amount'], 2);
++      $taxAmount = round($lineItem[$optionValueId]['tax_amount'], 2);
+     }
+     $taxRate = $field['options'][$optionValueId]['tax_rate'];
+     $lineItem[$optionValueId]['tax_amount'] = $taxAmount;
 diff --git a/templates/CRM/Price/Form/Calculate.tpl b/templates/CRM/Price/Form/Calculate.tpl
 index 0450dc3..b9e781a 100644
 --- a/templates/CRM/Price/Form/Calculate.tpl
