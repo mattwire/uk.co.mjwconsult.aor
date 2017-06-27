@@ -210,9 +210,9 @@ function aor_civicrm_alterContent(  &$content, $context, $tplName, &$object ) {
           $row = '<tr><td><a class="crm-popup" href="' . $url . '">' . $courseName . '</a></td>';
         }
         $row .= '<td><a href="#" class="action-item crm-hover-button delete-custom-row" title="Delete CPD Tutor record"'
-                    . 'data-delete_params="{&quot;valueID&quot;:'.$key.',&quot;groupID&quot;:&quot;'.$customGroup['id']
-                    . '&quot;,&quot;contactId&quot;:&quot;'.$contactId.'&quot;'
-                    . ',&quot;key&quot;:&quot;'.$apiStr.'&quot;}">Delete tutor for course</a></td>';
+          . 'data-delete_params="{&quot;valueID&quot;:'.$key.',&quot;groupID&quot;:&quot;'.$customGroup['id']
+          . '&quot;,&quot;contactId&quot;:&quot;'.$contactId.'&quot;'
+          . ',&quot;key&quot;:&quot;'.$apiStr.'&quot;}">Delete tutor for course</a></td>';
         $row .= '</tr>';
         $newTable .= $row;
       }
@@ -235,6 +235,26 @@ function aor_civicrm_coreResourceList(&$list, $region) {
     ->addStyleFile('uk.co.mjwconsult.aor', 'css/aor.css', 0, 'page-header')
     ->addScriptFile('uk.co.mjwconsult.aor', 'js/membership.js');
 }
+
+
+/**
+ * implement the hook to customize the summary view
+ */
+function aor_civicrm_pageRun( &$page ) {
+  if ($page->getVar('_name') == 'CRM_Contact_Page_View_Summary') {
+    // Generate external identifier if none defined (prefix contactId with "A")
+    $contactId = $page->getVar('_contactId');
+    $contact = civicrm_api3('Contact', 'getsingle', array(
+      'contact_id' => $contactId,
+    ));
+    if (empty($contact['external_identifier'])) {
+      $contact['external_identifier'] = 'A'.$contact['contact_id'];
+      $newContact = civicrm_api3('Contact', 'create', $contact);
+      CRM_Utils_System::redirect($_SERVER['REQUEST_URI']);
+    }
+  }
+}
+
 
 /**
  * Get the CPD Tutor custom group
