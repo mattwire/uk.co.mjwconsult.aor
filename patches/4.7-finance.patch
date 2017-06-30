@@ -1,0 +1,239 @@
+diff --git a/CRM/Contribute/Form/Contribution.php b/CRM/Contribute/Form/Contribution.php
+index 2cc479ee79..0436b8613d 100644
+--- a/CRM/Contribute/Form/Contribution.php
++++ b/CRM/Contribute/Form/Contribution.php
+@@ -355,7 +355,7 @@ class CRM_Contribute_Form_Contribution extends CRM_Contribute_Form_AbstractEditP
+       if (!empty($defaults['tax_amount'])) {
+         $componentDetails = CRM_Contribute_BAO_Contribution::getComponentDetails($this->_id);
+         if (!(CRM_Utils_Array::value('membership', $componentDetails) || CRM_Utils_Array::value('participant', $componentDetails))) {
+-          $defaults['total_amount'] = CRM_Utils_Money::format($defaults['total_amount'] - $defaults['tax_amount'], NULL, '%a');
++          $defaults['total_amount'] = CRM_Utils_Money::format($defaults['total_amount'] - $defaults['tax_amount'], NULL, '%a', TRUE);
+         }
+       }
+       else {
+diff --git a/CRM/Contribute/Form/Task/Invoice.php b/CRM/Contribute/Form/Task/Invoice.php
+index 121bf65ec0..e9ed0e2e0b 100644
+--- a/CRM/Contribute/Form/Task/Invoice.php
++++ b/CRM/Contribute/Form/Task/Invoice.php
+@@ -287,11 +287,11 @@ class CRM_Contribute_Form_Task_Invoice extends CRM_Contribute_Form_Task {
+       // to get billing address if present
+       $billingAddress = array();
+       foreach ($addressDetails as $address) {
+-        if ((isset($address['is_billing']) && $address['is_billing'] == 1) && (isset($address['is_primary']) && $address['is_primary'] == 1) && $address['contact_id'] == $contribution->contact_id) {
++        if (($address['is_billing'] == 1) && ($address['is_primary'] == 1) && ($address['contact_id'] == $contribution->contact_id)) {
+           $billingAddress[$address['contact_id']] = $address;
+           break;
+         }
+-        elseif (($address['is_billing'] == 0 && $address['is_primary'] == 1) || (isset($address['is_billing']) && $address['is_billing'] == 1) && $address['contact_id'] == $contribution->contact_id) {
++        elseif (($address['is_billing'] == 0 && $address['is_primary'] == 1) || ($address['is_billing'] == 1) && ($address['contact_id'] == $contribution->contact_id)) {
+           $billingAddress[$address['contact_id']] = $address;
+         }
+       }
+diff --git a/CRM/Core/BAO/Address.php b/CRM/Core/BAO/Address.php
+index 032ecee9a1..d64608d212 100644
+--- a/CRM/Core/BAO/Address.php
++++ b/CRM/Core/BAO/Address.php
+@@ -543,9 +543,9 @@ class CRM_Core_BAO_Address extends CRM_Core_DAO_Address {
+       $addresses[$count] = $values;
+ 
+       //unset is_primary after first block. Due to some bug in earlier version
+-      //there might be more than one primary blocks, hence unset is_primary other than first
++      //there might be more than one primary blocks, hence set is_primary = 0 other than first
+       if ($count > 1) {
+-        unset($addresses[$count]['is_primary']);
++        $addresses[$count]['is_primary'] = 0;
+       }
+ 
+       $count++;
+diff --git a/CRM/Member/Form/MembershipConfig.php b/CRM/Member/Form/MembershipConfig.php
+index e3f2df0ba7..22ae4b1798 100644
+--- a/CRM/Member/Form/MembershipConfig.php
++++ b/CRM/Member/Form/MembershipConfig.php
+@@ -83,7 +83,7 @@ class CRM_Member_Form_MembershipConfig extends CRM_Core_Form {
+     }
+ 
+     if (isset($defaults['minimum_fee'])) {
+-      $defaults['minimum_fee'] = CRM_Utils_Money::format($defaults['minimum_fee'], NULL, '%a');
++      $defaults['minimum_fee'] = filter_var($defaults['minimum_fee'], FILTER_SANITIZE_NUMBER_FLOAT, FILTER_FLAG_ALLOW_FRACTION);
+     }
+ 
+     if (isset($defaults['status'])) {
+diff --git a/CRM/Price/BAO/LineItem.php b/CRM/Price/BAO/LineItem.php
+index e1b629c4a7..4621e3f974 100644
+--- a/CRM/Price/BAO/LineItem.php
++++ b/CRM/Price/BAO/LineItem.php
+@@ -301,7 +301,8 @@ WHERE li.contribution_id = %1";
+       $taxRates = CRM_Core_PseudoConstant::getTaxRates();
+       if (isset($lineItems[$dao->id]['financial_type_id']) && array_key_exists($lineItems[$dao->id]['financial_type_id'], $taxRates)) {
+         // We are close to output/display here - so apply some rounding at output/display level - to not show Tax Rate in all 8 decimals
+-        $lineItems[$dao->id]['tax_rate'] = round($taxRates[$lineItems[$dao->id]['financial_type_id']], 3);
++        // Cast to float so trailing zero decimals are removed.
++        $lineItems[$dao->id]['tax_rate'] = (float)round($taxRates[$lineItems[$dao->id]['financial_type_id']], 3);
+       }
+       else {
+         // There is no Tax Rate associated with this Financial Type
+diff --git a/CRM/Price/BAO/PriceSet.php b/CRM/Price/BAO/PriceSet.php
+index 50189d2155..3acb4bb2f4 100644
+--- a/CRM/Price/BAO/PriceSet.php
++++ b/CRM/Price/BAO/PriceSet.php
+@@ -838,9 +838,7 @@ WHERE  id = %1";
+         $params['amount_level'] = CRM_Core_DAO::VALUE_SEPARATOR . implode(CRM_Core_DAO::VALUE_SEPARATOR, $amount_level) . $displayParticipantCount . CRM_Core_DAO::VALUE_SEPARATOR;
+       }
+     }
+-    // @todo this was a fix for CRM-16460 but is too deep in the system for formatting
+-    // and probably causes negative amounts to save as $0 depending on server config.
+-    $params['amount'] = CRM_Utils_Money::format($totalPrice, NULL, NULL, TRUE);
++    $params['amount'] = filter_var($totalPrice, FILTER_SANITIZE_NUMBER_FLOAT, FILTER_FLAG_ALLOW_FRACTION);
+     $params['tax_amount'] = $totalTax;
+     if ($component) {
+       foreach ($autoRenew as $dontCare => $eachAmount) {
+diff --git a/CRM/Price/Page/Option.php b/CRM/Price/Page/Option.php
+index 4c502ec55f..ef1287ace6 100644
+--- a/CRM/Price/Page/Option.php
++++ b/CRM/Price/Page/Option.php
+@@ -153,7 +153,7 @@ class CRM_Price_Page_Option extends CRM_Core_Page {
+       $action = array_sum(array_keys(self::actionLinks()));
+       // Adding the required fields in the array
+       if (isset($taxRate[$values['financial_type_id']])) {
+-        $customOption[$id]['tax_rate'] = $taxRate[$values['financial_type_id']];
++        $customOption[$id]['tax_rate'] = (float)$taxRate[$values['financial_type_id']];
+         if ($invoicing && isset($customOption[$id]['tax_rate'])) {
+           $getTaxDetails = TRUE;
+         }
+diff --git a/CRM/Utils/Rule.php b/CRM/Utils/Rule.php
+index a40286d4b5..897aa5dbbd 100644
+--- a/CRM/Utils/Rule.php
++++ b/CRM/Utils/Rule.php
+@@ -574,7 +574,10 @@ class CRM_Utils_Rule {
+       return TRUE;
+     }
+ 
+-    return preg_match('/(^-?\d+\.\d?\d?$)|(^-?\.\d\d?$)/', $value) ? TRUE : FALSE;
++    // Allow values such as -0, 1.024555, -.1
++    // We need to support multiple decimal places here, not just the number allowed by locale
++    //  otherwise tax calculations break when you want the inclusive amount to be a round number (eg. £10 inc. VAT requires 8.333333333 here).
++    return preg_match('/(^-?\d+\.?\d*$)|(^-?\.\d+$)/', $value) ? TRUE : FALSE;
+   }
+ 
+   /**
+diff --git a/templates/CRM/Contribute/Form/Contribution.tpl b/templates/CRM/Contribute/Form/Contribution.tpl
+index 193f2a4177..05cf3c123f 100644
+--- a/templates/CRM/Contribute/Form/Contribution.tpl
++++ b/templates/CRM/Contribute/Form/Contribution.tpl
+@@ -647,6 +647,7 @@ CRM.$(function($) {
+       if (!freezeFinancialType) {
+         var financialType = $('#financial_type_id').val();
+         var taxRates = '{/literal}{$taxRates}{literal}';
++        var taxTerm = '{/literal}{$taxTerm}{literal}';
+         taxRates = JSON.parse(taxRates);
+         var currencies = '{/literal}{$currencies}{literal}';
+         currencies = JSON.parse(currencies);
+@@ -673,7 +674,7 @@ CRM.$(function($) {
+         var totalTaxAmount = taxAmount + Number(totalAmount);
+         totalTaxAmount = formatMoney( totalTaxAmount, 2, separator, thousandMarker );
+ 
+-        $("#totalTaxAmount" ).html('Amount with tax : <span id="currencySymbolShow">' + currencySymbol + '</span> '+ totalTaxAmount);
++        $("#totalTaxAmount" ).html('Amount with ' + taxTerm + ' : <span id="currencySymbolShow">' + currencySymbol + '</span> '+ totalTaxAmount);
+       }
+       event.handled = true;
+     }
+diff --git a/templates/CRM/Contribute/Form/Contribution/Confirm.tpl b/templates/CRM/Contribute/Form/Contribution/Confirm.tpl
+index 571e708849..26c64f314a 100644
+--- a/templates/CRM/Contribute/Form/Contribution/Confirm.tpl
++++ b/templates/CRM/Contribute/Form/Contribution/Confirm.tpl
+@@ -76,7 +76,7 @@
+                 {/if}
+               {else}
+                 {if $totalTaxAmount }
+-                     {ts}Total Tax Amount{/ts}: <strong>{$totalTaxAmount|crmMoney} </strong><br />
++                     {ts}Total {$taxTerm} Amount{/ts}: <strong>{$totalTaxAmount|crmMoney} </strong><br />
+                 {/if}
+ 		{if $amount}
+                     {if $installments}{ts}Installment Amount{/ts}{else}{ts}Total Amount{/ts}{/if}: <strong>{$amount|crmMoney}{if $amount_level } &ndash; {$amount_level}{/if}</strong>
+diff --git a/templates/CRM/Contribute/Form/ContributionView.tpl b/templates/CRM/Contribute/Form/ContributionView.tpl
+index 33eee999e2..929b20ab6b 100644
+--- a/templates/CRM/Contribute/Form/ContributionView.tpl
++++ b/templates/CRM/Contribute/Form/ContributionView.tpl
+@@ -104,7 +104,7 @@
+   {/if}
+   {if $invoicing && $tax_amount}
+     <tr>
+-      <td class="label">{ts}Total Tax Amount{/ts}</td>
++      <td class="label">{ts}Total {$taxTerm} Amount{/ts}</td>
+       <td>{$tax_amount|crmMoney:$currency}</td>
+     </tr>
+   {/if}
+diff --git a/templates/CRM/Event/Form/Registration/Confirm.tpl b/templates/CRM/Event/Form/Registration/Confirm.tpl
+index e3a2d37287..bbb719f49d 100644
+--- a/templates/CRM/Event/Form/Registration/Confirm.tpl
++++ b/templates/CRM/Event/Form/Registration/Confirm.tpl
+@@ -119,7 +119,7 @@
+             </div>
+                 {if $totalTaxAmount}
+                   <div class="crm-section no-label total-amount-section">
+-                  <div class="content bold">{ts}Total Tax Amount{/ts}:&nbsp;&nbsp;{$totalTaxAmount|crmMoney}</div>
++                  <div class="content bold">{ts}Total {$taxTerm} Amount{/ts}:&nbsp;&nbsp;{$totalTaxAmount|crmMoney}</div>
+                   <div class="clear"></div>
+                   </div>
+                 {/if}
+diff --git a/templates/CRM/Price/Form/Field.tpl b/templates/CRM/Price/Form/Field.tpl
+index d21821485a..ccb8d1fbcc 100644
+--- a/templates/CRM/Price/Form/Field.tpl
++++ b/templates/CRM/Price/Form/Field.tpl
+@@ -209,7 +209,7 @@
+     var postUrl = "{/literal}{crmURL p='civicrm/ajax/memType' h=0}{literal}";
+ 
+     cj.post( postUrl, {mtype: mtype}, function(data) {
+-      cj("#option_amount_"+ row).val(data.total_amount);
++      cj("#option_amount_"+ row).val(data.total_amount_numeric);
+       cj("#option_label_"+ row).val(data.name);
+       cj("#option_financial_type_id_"+ row).val(data.financial_type_id);
+       if (data.name) {
+diff --git a/templates/CRM/Price/Form/Option.tpl b/templates/CRM/Price/Form/Option.tpl
+index a52d23666b..7c2335f37f 100644
+--- a/templates/CRM/Price/Form/Option.tpl
++++ b/templates/CRM/Price/Form/Option.tpl
+@@ -115,7 +115,7 @@
+         var mtype = cj("#membership_type_id").val();
+         var postUrl = "{/literal}{crmURL p='civicrm/ajax/memType' h=0}{literal}";
+         cj.post( postUrl, {mtype: mtype}, function( data ) {
+-          cj("#amount").val( data.total_amount );
++          cj("#amount").val( data.total_amount_numeric );
+           cj("#label").val( data.name );
+ 
+         }, 'json');
+diff --git a/templates/CRM/Price/Page/LineItem.tpl b/templates/CRM/Price/Page/LineItem.tpl
+index 21f093899a..7b7d542dce 100644
+--- a/templates/CRM/Price/Page/LineItem.tpl
++++ b/templates/CRM/Price/Page/LineItem.tpl
+@@ -78,7 +78,7 @@
+     {if $getTaxDetails}
+       <td class="right">{$line.line_total|crmMoney}</td>
+       {if $line.tax_rate != "" || $line.tax_amount != ""}
+-        <td class="right">{$taxTerm} ({$line.tax_rate|string_format:"%.3f"}%)</td>
++        <td class="right">{$taxTerm} ({$line.tax_rate}%)</td>
+         <td class="right">{$line.tax_amount|crmMoney}</td>
+       {else}
+         <td></td>
+@@ -98,7 +98,7 @@
+ <div class="crm-section no-label total_amount-section">
+   <div class="content bold">
+     {if $getTaxDetails && $totalTaxAmount}
+-      {ts}Total Tax Amount{/ts}: {$totalTaxAmount|crmMoney}<br />
++      {ts}Total {$taxTerm} Amount{/ts}: {$totalTaxAmount|crmMoney}<br />
+     {/if}
+     {if $context EQ "Contribution"}
+       {ts}Contribution Total{/ts}:
+diff --git a/templates/CRM/Price/Page/Option.tpl b/templates/CRM/Price/Page/Option.tpl
+index 76b625f470..1e337c2c6d 100644
+--- a/templates/CRM/Price/Page/Option.tpl
++++ b/templates/CRM/Price/Page/Option.tpl
+@@ -89,7 +89,7 @@
+               <td class="nowrap crm-price-option-order">{$row.weight}</td>
+               {if $getTaxDetails}
+                 <td>{if $row.tax_rate != '' }
+-                      {$taxTerm} ({$row.tax_rate|string_format:"%.2f"}%)
++                      {$taxTerm} ({$row.tax_rate}%)
+                     {/if}
+                 </td>
+                 <td>{$row.tax_amount|crmMoney}</td>
