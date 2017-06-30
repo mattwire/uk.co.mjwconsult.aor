@@ -4,15 +4,20 @@
 function aor_filter_membership() {
     /* FIXME: This needs changing to lowercase for civi 4.7 */
     var vat_cb = [
-        CRM.$('div.Membership_Fee_Ex_VAT_-row1 span input[type=checkbox]'),
+        // Force selection of non-vatable amount
         CRM.$('div.non_vatable-row1 span input[type=checkbox]')
     ];
     vat_cb.forEach(membership_cb);
     var vat_cb_label = [
-        CRM.$('div.Membership_Fee_Ex_VAT_-section div.label label'),
         CRM.$('div.non_vatable-section div.label label')
     ];
     vat_cb_label.forEach(membership_cb_label);
+
+    // Send receipt by default
+    var sendReceipt = CRM.$('input#send_receipt');
+    if (sendReceipt.prop('checked') === false) {
+        sendReceipt.click();
+    }
 
     function membership_cb(vat_cb) {
         if (vat_cb.prop('checked') === false) {
