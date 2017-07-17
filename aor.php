@@ -198,7 +198,7 @@ function aor_civicrm_alterContent(  &$content, $context, $tplName, &$object ) {
         $result = civicrm_api3('Membership', 'get', array(
           'id' => $mId,
         ));
-        if (!empty($result['is_error'] || empty($result['id']))) {
+        if (!empty($result['is_error']) || empty($result['id'])) {
           CRM_Core_Session::setStatus('Could not find membership with Id: '. $mId, 'Error');
           $row = '<tr><td>Unknown ID: ' . $mId . '</td>';
         }
