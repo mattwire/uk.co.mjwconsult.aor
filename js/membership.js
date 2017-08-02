@@ -2,7 +2,6 @@
  * Created by matthew on 31/05/17.
  */
 function aor_filter_membership() {
-    /* FIXME: This needs changing to lowercase for civi 4.7 */
     var vat_cb = [
         // Force selection of non-vatable amount
         CRM.$('div.non_vatable-row1 span input[type=checkbox]')

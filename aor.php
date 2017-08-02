@@ -255,6 +255,14 @@ function aor_civicrm_pageRun( &$page ) {
   }
 }
 
+function aor_civicrm_buildForm($formName, &$form) {
+  switch ($formName) {
+    case 'CRM_Event_Form_ManageEvent_Location':
+      CRM_Core_Resources::singleton()->addScriptFile('uk.co.mjwconsult.aor', 'js/address.js');
+      break;
+  }
+}
+
 
 /**
  * Get the CPD Tutor custom group
