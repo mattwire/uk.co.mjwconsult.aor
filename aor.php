@@ -247,13 +247,8 @@ function aor_civicrm_pageRun( &$page ) {
     $contact = civicrm_api3('Contact', 'getsingle', array(
       'contact_id' => $contactId,
     ));
-    if (empty($contact['external_identifier']) || empty($contact['custom_35'])) {
-      if (empty($contact['external_identifier'])) {
-        $contact['external_identifier'] = 'A' . $contact['contact_id'];
-      }
-      if (empty($contact['custom_35'])) {
-        $contact['custom_35'] = 'A' . $contact['contact_id'];
-      }
+    if (empty($contact['external_identifier'])) {
+      $contact['external_identifier'] = 'A'.$contact['contact_id'];
       $newContact = civicrm_api3('Contact', 'create', $contact);
       CRM_Utils_System::redirect($_SERVER['REQUEST_URI']);
     }
