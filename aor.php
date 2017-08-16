@@ -250,7 +250,7 @@ function aor_civicrm_pageRun( &$page ) {
     if (empty($contact['external_identifier'])) {
       $fp = fopen(CRM_Utils_File::tempnam(), "r+");
       if (flock($fp, LOCK_EX)) {  // acquire an exclusive lock
-        $nextMembershipNo = CRM_Aor_Utils::getSettings('aor_next_membership_number', 30000);
+        $nextMembershipNo = CRM_Aor_Utils::getSettings('aor_next_membership_number');
         if ($nextMembershipNo > 499999) {
           Civi::log()
             ->warning('uk.co.mjwconsult.aor not creating new AoR membership number as it would cause duplicate >= 500000');
@@ -270,6 +270,8 @@ function aor_civicrm_pageRun( &$page ) {
           Civi::log()
             ->info('uk.co.mjwconsult.aor: Unable to update field custom_35 for membership id: ' . $membership['id'] . ' Error: ' . $e->getMessage());
           flock($fp, LOCK_UN);    // release the lock
+          // Refresh the contact summary
+          CRM_Utils_System::redirect($_SERVER['REQUEST_URI']);
           return NULL;
         }
 

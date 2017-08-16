@@ -6,8 +6,8 @@ class CRM_Aor_Utils {
   /**
    * Returns settings
    */
-  static function getSettings($name = NULL, $defaultValue = NULL) {
-    return CRM_Core_BAO_Setting::getItem(CRM_Aor_Utils::PREFERENCES_NAME, $name, NULL, $defaultValue);
+  static function getSettings($name = NULL) {
+    return CRM_Core_BAO_Setting::getItem(CRM_Aor_Utils::PREFERENCES_NAME, $name);
   }
 
   static function setSetting($value, $name) {
