@@ -3,6 +3,22 @@
 require_once 'aor.civix.php';
 
 /**
+ * Returns array of financial type Ids used for membership. Use in api calls relating to membership
+ * @return array
+ */
+function _aor_getMembershipFinancialTypes() {
+  return array('IN' => array(2, 42, 72, 81)); // "Member Dues", Historical Member dues, membership inc vat, membership no vat
+}
+
+/**
+ * Membership Number custom field for memberships (this is copied from contact external_identifier for the latest current membership only)
+ * @return string
+ */
+function _aor_getMembershipNoCustomField() {
+  return 'custom_35';
+}
+
+/**
  * Implements hook_civicrm_config().
  *
  * @link http://wiki.civicrm.org/confluence/display/CRMDOC/hook_civicrm_config
@@ -236,6 +252,106 @@ function aor_civicrm_coreResourceList(&$list, $region) {
     ->addScriptFile('uk.co.mjwconsult.aor', 'js/membership.js');
 }
 
+function aor_civicrm_pre($op, $objectName, $objectId, &$objectRef) {
+  switch ($objectName) {
+    case 'Individual':
+      _aor_civicrm_preUpdateContact($op, $objectId, $objectRef);
+      break;
+  }
+}
+
+function aor_civicrm_post($op, $objectName, $objectId, &$objectRef) {
+  switch ($objectName) {
+    case 'Membership':
+      _aor_civicrm_postUpdateMembership($op, $objectRef);
+      break;
+  }
+}
+
+function _aor_civicrm_preUpdateContact($op, $objectId, &$objectRef) {
+  switch ($op) {
+    case 'view':
+    case 'create':
+    case 'edit':
+    case 'restore':
+      $contact = _aor_civicrm_addContactMembershipNumber($objectRef, FALSE);
+      if ($contact) {
+        $objectRef = $contact;
+      }
+      break;
+  }
+}
+
+function _aor_civicrm_addContactMembershipNumber($contact, $commit) {
+  if (!empty($contact['external_identifier'])) {
+    return NULL;
+  }
+
+  $fp = fopen(CRM_Utils_File::tempnam(), "r+");
+  if (flock($fp, LOCK_EX)) {  // acquire an exclusive lock
+    $nextMembershipNo = CRM_Aor_Utils::getSettings('aor_next_membership_number');
+    if ($nextMembershipNo > 499999) {
+      Civi::log()
+        ->warning('uk.co.mjwconsult.aor not creating new AoR membership number as it would cause duplicate >= 500000');
+      flock($fp, LOCK_UN);    // release the lock
+      return NULL;
+    }
+
+    $contact['external_identifier'] = $nextMembershipNo;
+    if ($commit) {
+      $contact = civicrm_api3('Contact', 'create', $contact);
+    }
+    // Save the next available membership number
+    CRM_Aor_Utils::setSetting($nextMembershipNo + 1, 'aor_next_membership_number');
+    flock($fp, LOCK_UN);    // release the lock
+
+    return $contact;
+  }
+}
+
+function _aor_civicrm_postUpdateMembership($op, &$objectRef) {
+  switch ($op) {
+    case 'view':
+    case 'create':
+    //case 'edit':
+    case 'restore':
+      $membership = civicrm_api3('Membership', 'getsingle', array('id' => $objectRef->id));
+      _aor_civicrm_addContactMembershipNumberToMembership($membership['contact_id']);
+      break;
+  }
+}
+
+function _aor_civicrm_addContactMembershipNumberToMembership($contactId) {
+  try {
+    $contact = civicrm_api3('Contact', 'getsingle', array(
+      'id' => $contactId,
+    ));
+  }
+  catch (Exception $e) {
+    Civi::log()->warning('Could not get contact id ' . $contactId . ' for membership ' . $e->getMessage());
+    return NULL;
+  }
+
+  // Add membership number to latest current membership record
+  $membership = _aor_getLatestMembership($contactId);
+
+  // if custom_35 already set, don't set it again
+  if ($membership[_aor_getMembershipNoCustomField()] == $contact['external_identifier']) {
+    return NULL;
+  }
+  // Clear membership numbers from all other memberships
+  _aor_civicrmClearMembershipsMembershipNo($contactId);
+
+  $membership[_aor_getMembershipNoCustomField()] = $contact['external_identifier'];
+  try {
+    $membership = civicrm_api3('membership', 'create', $membership);
+    return CRM_Utils_Array::first($membership['values']);
+  } catch (Exception $e) {
+    Civi::log()
+      ->info('uk.co.mjwconsult.aor: Unable to update field '. _aor_getMembershipNoCustomField() . ' for membership id: ' . $membership['id'] . ' Error: ' . $e->getMessage());
+    return NULL;
+  }
+}
 
 /**
  * implement the hook to customize the summary view
@@ -247,52 +363,25 @@ function aor_civicrm_pageRun( &$page ) {
     $contact = civicrm_api3('Contact', 'getsingle', array(
       'contact_id' => $contactId,
     ));
-    if (empty($contact['external_identifier'])) {
-      $fp = fopen(CRM_Utils_File::tempnam(), "r+");
-      if (flock($fp, LOCK_EX)) {  // acquire an exclusive lock
-        $nextMembershipNo = CRM_Aor_Utils::getSettings('aor_next_membership_number');
-        if ($nextMembershipNo > 499999) {
-          Civi::log()
-            ->warning('uk.co.mjwconsult.aor not creating new AoR membership number as it would cause duplicate >= 500000');
-          flock($fp, LOCK_UN);    // release the lock
-          return;
-        }
-
-        $contact['external_identifier'] = $nextMembershipNo;
-        $newContact = civicrm_api3('Contact', 'create', $contact);
-
-        // Save the next available membership number
-        CRM_Aor_Utils::setSetting($nextMembershipNo + 1, 'aor_next_membership_number');
-        flock($fp, LOCK_UN);    // release the lock
-
-        // Add membership number to latest current membership record
-        $membership = _aor_getLatestMembership($contactId);
-        $membership['custom_35'] = $contact['external_identifier'];
-        try {
-          civicrm_api3('membership', 'create', $membership);
-        } catch (Exception $e) {
-          Civi::log()
-            ->info('uk.co.mjwconsult.aor: Unable to update field custom_35 for membership id: ' . $membership['id'] . ' Error: ' . $e->getMessage());
-        }
-
-        // Refresh the contact summary
-        CRM_Utils_System::redirect($_SERVER['REQUEST_URI']);
-      }
-      else {
-        Civi::log()
-          ->warning('uk.co.mjwconsult.aor could not get lock to generate new membership number');
-        return;
-      }
+    $updatedContact = _aor_civicrm_addContactMembershipNumber($contact, TRUE);
+    _aor_civicrm_addContactMembershipNumberToMembership($contact['id']);
+    if ($updatedContact) {
+      // Refresh the contact summary
+      CRM_Utils_System::redirect($_SERVER['REQUEST_URI']);
     }
   }
 }
 
-/**
- * Returns array of financial type Ids used for membership. Use in api calls relating to membership
- * @return array
- */
-function _aor_getMembershipFinancialTypes() {
-  return array('IN' => array(2, 42, 72, 81)); // "Member Dues", Historical Member dues, membership inc vat, membership no vat
+function _aor_civicrmClearMembershipsMembershipNo($cid) {
+  $memberships = civicrm_api3('Membership', 'get', array('contact_id' => $cid));
+  if (!empty($memberships['count'])) {
+    foreach ($memberships['values'] as $membership) {
+      if (!empty($membership[_aor_getMembershipNoCustomField()])) {
+        $membership[_aor_getMembershipNoCustomField()] = '';
+        civicrm_api3('Membership', 'create', $membership);
+      }
+    }
+  }
 }
 
 function _aor_getLatestMembership($cid) {
@@ -307,8 +396,7 @@ function _aor_getLatestMembership($cid) {
   // Only get memberships with financial type "Member Dues"
   try {
     $membershipTypes = civicrm_api3('MembershipType', 'get', array(
-      //'financial_type_id' => _aor_getMembershipFinancialTypes(),
-      'financial_type_id' => 2,
+      'financial_type_id' => _aor_getMembershipFinancialTypes(),
     ));
   }
   catch (Exception $e) {
@@ -321,11 +409,6 @@ function _aor_getLatestMembership($cid) {
   }
   $params['membership_type_id'] = array('IN' => $types);
 
-  static $statuses;
-  if (empty($statuses)) {
-    $statuses = civicrm_api3('membership', 'getoptions', array('field' => 'status_id'));
-    $statuses = $statuses['values'];
-  }
   try {
     $membership = civicrm_api3('membership', 'getsingle', $params);
   }
