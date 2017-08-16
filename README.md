@@ -9,3 +9,6 @@ Customise display of custom group tab on contact summary.
 
 ## Address Listings
 Hide FAR address custom data on event pages
+
+## External ID (Membership Number)
+This field holds the legacy AoR membership number.  For new contacts a new membership number is generated, starting at 30000.  Additionally this number is copied to the latest current membership (field custom_35).
