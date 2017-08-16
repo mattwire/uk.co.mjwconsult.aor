@@ -248,11 +248,73 @@ function aor_civicrm_pageRun( &$page ) {
       'contact_id' => $contactId,
     ));
     if (empty($contact['external_identifier'])) {
-      $contact['external_identifier'] = 'A'.$contact['contact_id'];
+      $contact['external_identifier'] = 30000 + (int) $contact['contact_id'];
+      if ($contact['external_identifier'] > 499999) {
+        Civi::log()->warning('uk.co.mjwconsult.aor not creating new AoR membership number as it would cause duplicate >= 500000');
+        return;
+      }
       $newContact = civicrm_api3('Contact', 'create', $contact);
       CRM_Utils_System::redirect($_SERVER['REQUEST_URI']);
     }
+    $membership = _aor_getLatestMembership($contactId);
+    $membership['custom_35'] = $contact['external_identifier'];
+    try {
+      civicrm_api3('membership', 'create', $membership);
+    }
+    catch (Exception $e) {
+      Civi::log()->info('uk.co.mjwconsult.aor: Unable to update field custom_35 for membership id: ' . $membership['id'] . ' Error: ' . $e->getMessage());
+      return NULL;
+    }
   }
+}
+
+/**
+ * Returns array of financial type Ids used for membership. Use in api calls relating to membership
+ * @return array
+ */
+function _aor_getMembershipFinancialTypes() {
+  return array(2, 42, 72, 81); // "Member Dues", Historical Member dues, membership inc vat, membership no vat
+}
+
+function _aor_getLatestMembership($cid) {
+  $params = array(
+    'version' => 3,
+    'contact_id' => $cid,
+    'sequential' => 1,
+    'api.membership_type.getsingle' => 1,
+    'options' => array('limit' => 1, 'sort' => 'end_date DESC'),
+  );
+
+  // Only get memberships with financial type "Member Dues"
+  try {
+    $membershipTypes = civicrm_api3('MembershipType', 'get', array(
+      //'financial_type_id' => _aor_getMembershipFinancialTypes(),
+      'financial_type_id' => 2,
+    ));
+  }
+  catch (Exception $e) {
+    Civi::log()->info('uk.co.mjwconsult.aor: Invalid financial type ' . $e->getMessage());
+    return NULL;
+  }
+
+  foreach ($membershipTypes['values'] as $typeId => $val) {
+    $types[] = $val['name'];
+  }
+  $params['membership_type_id'] = array('IN' => $types);
+
+  static $statuses;
+  if (empty($statuses)) {
+    $statuses = civicrm_api3('membership', 'getoptions', array('field' => 'status_id'));
+    $statuses = $statuses['values'];
+  }
+  try {
+    $membership = civicrm_api3('membership', 'getsingle', $params);
+  }
+  catch (Exception $e) {
+    Civi::log()->info('uk.co.mjwconsult.aor: No membership found ' . $e->getMessage());
+    return NULL;
+  }
+  return $membership;
 }
 
 function aor_civicrm_buildForm($formName, &$form) {
