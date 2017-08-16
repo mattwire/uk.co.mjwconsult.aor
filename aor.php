@@ -261,6 +261,10 @@ function aor_civicrm_pageRun( &$page ) {
         $contact['external_identifier'] = $nextMembershipNo;
         $newContact = civicrm_api3('Contact', 'create', $contact);
 
+        // Save the next available membership number
+        CRM_Aor_Utils::setSetting($nextMembershipNo + 1, 'aor_next_membership_number');
+        flock($fp, LOCK_UN);    // release the lock
+
         // Add membership number to latest current membership record
         $membership = _aor_getLatestMembership($contactId);
         $membership['custom_35'] = $contact['external_identifier'];
@@ -269,16 +273,8 @@ function aor_civicrm_pageRun( &$page ) {
         } catch (Exception $e) {
           Civi::log()
             ->info('uk.co.mjwconsult.aor: Unable to update field custom_35 for membership id: ' . $membership['id'] . ' Error: ' . $e->getMessage());
-          flock($fp, LOCK_UN);    // release the lock
-          // Refresh the contact summary
-          CRM_Utils_System::redirect($_SERVER['REQUEST_URI']);
-          return NULL;
         }
 
-        // Save the next available membership number
-        CRM_Aor_Utils::setSettings($nextMembershipNo + 1, 'aor_next_membership_number');
-
-        flock($fp, LOCK_UN);    // release the lock
         // Refresh the contact summary
         CRM_Utils_System::redirect($_SERVER['REQUEST_URI']);
       }
