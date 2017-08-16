@@ -248,22 +248,43 @@ function aor_civicrm_pageRun( &$page ) {
       'contact_id' => $contactId,
     ));
     if (empty($contact['external_identifier'])) {
-      $contact['external_identifier'] = 30000 + (int) $contact['contact_id'];
-      if ($contact['external_identifier'] > 499999) {
-        Civi::log()->warning('uk.co.mjwconsult.aor not creating new AoR membership number as it would cause duplicate >= 500000');
+      $fp = fopen(CRM_Utils_File::tempnam(), "r+");
+      if (flock($fp, LOCK_EX)) {  // acquire an exclusive lock
+        $nextMembershipNo = CRM_Aor_Utils::getSettings('aor_next_membership_number', 30000);
+        if ($nextMembershipNo > 499999) {
+          Civi::log()
+            ->warning('uk.co.mjwconsult.aor not creating new AoR membership number as it would cause duplicate >= 500000');
+          flock($fp, LOCK_UN);    // release the lock
+          return;
+        }
+
+        $contact['external_identifier'] = $nextMembershipNo;
+        $newContact = civicrm_api3('Contact', 'create', $contact);
+
+        // Add membership number to latest current membership record
+        $membership = _aor_getLatestMembership($contactId);
+        $membership['custom_35'] = $contact['external_identifier'];
+        try {
+          civicrm_api3('membership', 'create', $membership);
+        } catch (Exception $e) {
+          Civi::log()
+            ->info('uk.co.mjwconsult.aor: Unable to update field custom_35 for membership id: ' . $membership['id'] . ' Error: ' . $e->getMessage());
+          flock($fp, LOCK_UN);    // release the lock
+          return NULL;
+        }
+
+        // Save the next available membership number
+        CRM_Aor_Utils::setSettings($nextMembershipNo + 1, 'aor_next_membership_number');
+
+        flock($fp, LOCK_UN);    // release the lock
+        // Refresh the contact summary
+        CRM_Utils_System::redirect($_SERVER['REQUEST_URI']);
+      }
+      else {
+        Civi::log()
+          ->warning('uk.co.mjwconsult.aor could not get lock to generate new membership number');
         return;
       }
-      $newContact = civicrm_api3('Contact', 'create', $contact);
-      CRM_Utils_System::redirect($_SERVER['REQUEST_URI']);
-    }
-    $membership = _aor_getLatestMembership($contactId);
-    $membership['custom_35'] = $contact['external_identifier'];
-    try {
-      civicrm_api3('membership', 'create', $membership);
-    }
-    catch (Exception $e) {
-      Civi::log()->info('uk.co.mjwconsult.aor: Unable to update field custom_35 for membership id: ' . $membership['id'] . ' Error: ' . $e->getMessage());
-      return NULL;
     }
   }
 }
@@ -273,7 +294,7 @@ function aor_civicrm_pageRun( &$page ) {
  * @return array
  */
 function _aor_getMembershipFinancialTypes() {
-  return array(2, 42, 72, 81); // "Member Dues", Historical Member dues, membership inc vat, membership no vat
+  return array('IN' => array(2, 42, 72, 81)); // "Member Dues", Historical Member dues, membership inc vat, membership no vat
 }
 
 function _aor_getLatestMembership($cid) {
