@@ -252,6 +252,13 @@ function aor_civicrm_coreResourceList(&$list, $region) {
     ->addScriptFile('uk.co.mjwconsult.aor', 'js/membership.js');
 }
 
+/**
+ * Called before every database commit
+ * @param $op
+ * @param $objectName
+ * @param $objectId
+ * @param $objectRef
+ */
 function aor_civicrm_pre($op, $objectName, $objectId, &$objectRef) {
   switch ($objectName) {
     case 'Individual':
@@ -260,6 +267,13 @@ function aor_civicrm_pre($op, $objectName, $objectId, &$objectRef) {
   }
 }
 
+/**
+ * Called after every database commit
+ * @param $op
+ * @param $objectName
+ * @param $objectId
+ * @param $objectRef
+ */
 function aor_civicrm_post($op, $objectName, $objectId, &$objectRef) {
   switch ($objectName) {
     case 'Membership':
@@ -268,6 +282,14 @@ function aor_civicrm_post($op, $objectName, $objectId, &$objectRef) {
   }
 }
 
+/**
+ * Contact handler for hook_civicrm_pre
+ * We add an external id (membership number) for the contact here if it doesn't have one.
+ *
+ * @param $op
+ * @param $objectId
+ * @param $objectRef
+ */
 function _aor_civicrm_preUpdateContact($op, $objectId, &$objectRef) {
   switch ($op) {
     case 'view':
@@ -282,6 +304,37 @@ function _aor_civicrm_preUpdateContact($op, $objectId, &$objectRef) {
   }
 }
 
+/**
+ * Membership handler for hook_civicrm_post
+ * We add the external id (membership number) to the latest current membership here.
+ * NOTE: It must be done via a callback because the database transaction is not completed when this hook is called!
+ *
+ * @param $op
+ * @param $objectRef
+ */
+function _aor_civicrm_postUpdateMembership($op, &$objectRef) {
+  switch ($op) {
+    case 'create':
+    case 'restore':
+      try {
+        $membership = civicrm_api3('Membership', 'getsingle', array('id' => $objectRef->id));
+      }
+      catch (Exception $e) {
+        return;
+      }
+      CRM_Core_Transaction::addCallback(CRM_Core_Transaction::PHASE_POST_COMMIT,
+        '_aor_civicrm_addContactMembershipNumberToMembership', array($membership));
+      break;
+  }
+}
+
+/**
+ * Add an external identifier (membership number) to a contact.
+ * @param $contact
+ * @param $commit
+ *
+ * @return array|null
+ */
 function _aor_civicrm_addContactMembershipNumber($contact, $commit) {
   if (!empty($contact['external_identifier'])) {
     return NULL;
@@ -309,52 +362,45 @@ function _aor_civicrm_addContactMembershipNumber($contact, $commit) {
   }
 }
 
-function _aor_civicrm_postUpdateMembership($op, &$objectRef) {
-  switch ($op) {
-    case 'view':
-    case 'create':
-    //case 'edit':
-    case 'restore':
-      $membership = civicrm_api3('Membership', 'getsingle', array('id' => $objectRef->id));
-      _aor_civicrm_addContactMembershipNumberToMembership($membership['contact_id']);
-      break;
-  }
-}
-
-function _aor_civicrm_addContactMembershipNumberToMembership($contactId) {
+/**
+ * Add the external identifier (membership number) to the latest current membership
+ * @param $membership
+ *
+ * @return null
+ */
+function _aor_civicrm_addContactMembershipNumberToMembership($membership) {
   try {
     $contact = civicrm_api3('Contact', 'getsingle', array(
-      'id' => $contactId,
+      'id' => $membership['contact_id'],
     ));
   }
   catch (Exception $e) {
-    Civi::log()->warning('Could not get contact id ' . $contactId . ' for membership ' . $e->getMessage());
+    Civi::log()->warning('Could not get contact from membership. ' . $e->getMessage());
     return NULL;
   }
-
-  // Add membership number to latest current membership record
-  $membership = _aor_getLatestMembership($contactId);
 
   // if custom_35 already set, don't set it again
   if ($membership[_aor_getMembershipNoCustomField()] == $contact['external_identifier']) {
     return NULL;
   }
   // Clear membership numbers from all other memberships
-  _aor_civicrmClearMembershipsMembershipNo($contactId);
+  _aor_civicrm_clearMembershipsMembershipNo($membership['contact_id']);
 
   $membership[_aor_getMembershipNoCustomField()] = $contact['external_identifier'];
+
   try {
     $membership = civicrm_api3('membership', 'create', $membership);
-    return CRM_Utils_Array::first($membership['values']);
   } catch (Exception $e) {
     Civi::log()
-      ->info('uk.co.mjwconsult.aor: Unable to update field '. _aor_getMembershipNoCustomField() . ' for membership id: ' . $membership['id'] . ' Error: ' . $e->getMessage());
+      ->info('uk.co.mjwconsult.aor: Unable to update field '. _aor_getMembershipNoCustomField() . ' for membership id: ' . (isset($membership['id']) ? $membership['id'] : NULL) . ' Error: ' . $e->getMessage());
     return NULL;
   }
 }
 
 /**
  * implement the hook to customize the summary view
+ *
+ * This checks and creates external id (membership number) for contact and latest membership if not already defined.
  */
 function aor_civicrm_pageRun( &$page ) {
   if ($page->getVar('_name') == 'CRM_Contact_Page_View_Summary') {
@@ -364,7 +410,7 @@ function aor_civicrm_pageRun( &$page ) {
       'contact_id' => $contactId,
     ));
     $updatedContact = _aor_civicrm_addContactMembershipNumber($contact, TRUE);
-    _aor_civicrm_addContactMembershipNumberToMembership($contact['id']);
+    _aor_civicrm_addContactMembershipNumberToMembership(_aor_civicrm_getLatestMembership($contact['id']));
     if ($updatedContact) {
       // Refresh the contact summary
       CRM_Utils_System::redirect($_SERVER['REQUEST_URI']);
@@ -372,7 +418,11 @@ function aor_civicrm_pageRun( &$page ) {
   }
 }
 
-function _aor_civicrmClearMembershipsMembershipNo($cid) {
+/**
+ * Clear membership number field for all memberships for contact id.
+ * @param $cid
+ */
+function _aor_civicrm_clearMembershipsMembershipNo($cid) {
   $memberships = civicrm_api3('Membership', 'get', array('contact_id' => $cid));
   if (!empty($memberships['count'])) {
     foreach ($memberships['values'] as $membership) {
@@ -384,7 +434,13 @@ function _aor_civicrmClearMembershipsMembershipNo($cid) {
   }
 }
 
-function _aor_getLatestMembership($cid) {
+/**
+ * Get the latest membership for contact id.
+ * @param $cid
+ *
+ * @return array|null
+ */
+function _aor_civicrm_getLatestMembership($cid) {
   $params = array(
     'version' => 3,
     'contact_id' => $cid,
@@ -426,7 +482,6 @@ function aor_civicrm_buildForm($formName, &$form) {
       break;
   }
 }
-
 
 /**
  * Get the CPD Tutor custom group
