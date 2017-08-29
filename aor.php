@@ -340,7 +340,8 @@ function _aor_civicrm_addContactMembershipNumber($contact, $commit) {
     return NULL;
   }
 
-  $fp = fopen(CRM_Utils_File::tempnam(), "r+");
+  $lockfile = sys_get_temp_dir() . '/aor_civicrm_addcontactmembershipnumber.lock';
+  $fp = fopen($lockfile, "r+");
   if (flock($fp, LOCK_EX)) {  // acquire an exclusive lock
     $nextMembershipNo = CRM_Aor_Utils::getSettings('aor_next_membership_number');
     if ($nextMembershipNo > 499999) {
