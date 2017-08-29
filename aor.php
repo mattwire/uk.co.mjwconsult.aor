@@ -545,7 +545,6 @@ function aor_civicrm_links($op, $objectName, $objectId, &$links, &$mask, &$value
           if (_aor_is_membership($mid)) {
             $mtid = 131;
           }
-          $mtid = 131;
           if ($mtid) {
             $links[] = array(
               'name' => ts('Print Letter'),
