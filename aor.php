@@ -577,13 +577,13 @@ function aor_civicrm_links($op, $objectName, $objectId, &$links, &$mask, &$value
             'name' => ts('Print Letter'),
             'title' => ts('Print Letter'),
             'url' => 'civicrm/activity/pdf/add',
-            'qs' => "action=add&reset=1&cid={$cid}&selectedChild=activity&atype=22&pid={$mid}",
+            'qs' => "action=add&reset=1&cid={$cid}&selectedChild=activity&atype=22&mid={$mid}",
           );
           $links[] = array(
             'name' => ts('Send Email'),
             'title' => ts('Send Email'),
             'url' => 'civicrm/activity/email/add',
-            'qs' => "action=add&reset=1&cid={$cid}&selectedChild=activity&atype=3&pid={$mid}",
+            'qs' => "action=add&reset=1&cid={$cid}&selectedChild=activity&atype=3&mid={$mid}",
           );
       }
       break;
