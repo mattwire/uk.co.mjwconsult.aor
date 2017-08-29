@@ -418,6 +418,177 @@ function aor_civicrm_pageRun( &$page ) {
   }
 }
 
+function aor_civicrm_tokens( &$tokens ) {
+  $tokens['event'] = array(
+    'event.type' => ts("Event Type"),
+    'event.name' => ts("Event Name"),
+    'event.membertickets' => ts("Number of member tickets"),
+    'event.nonmembertickets' => ts("Number of non-member tickets"),
+    'event.totaltickets' => ts("Total Number of tickets"),
+    'event.membernetamount' => ts("Member net amount"),
+    'event.membertaxamount' => ts("Member tax amount"),
+    'event.membertotalamount' => ts("Member total amount"),
+    'event.nonmembernetamount' => ts("Non Member net amount"),
+    'event.nonmembertaxamount' => ts("Non Member tax amount"),
+    'event.nonmembertotalamount' => ts("Non Member total amount"),
+    'event.totalnetamount' => ts("Total Net Amount"),
+    'event.totaltaxamount' => ts("Total Tax Amount"),
+    'event.totalamount' => ts("Total Amount"),
+  );
+}
+
+function aor_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array(), $context = null) {
+  // Event tokens
+  if (!empty($tokens['event'])) {
+    $pId = CRM_Utils_Request::getValue('participant_id', $_REQUEST);
+    if ($pId) {
+      try {
+        $participantRecord = civicrm_api3('Participant', 'getsingle', array(
+          'id' => $pId,
+        ));
+      }
+      catch (Exception $e) {
+        return;
+      }
+
+      $participantPayments = civicrm_api3('ParticipantPayment', 'get', array(
+        'participant_id' => $pId,
+      ));
+
+      $member = $nonmember = $total = array();
+      foreach ($participantPayments['values'] as $payment) {
+        $lineItems = civicrm_api3('LineItem', 'get', array(
+          'contribution_id' => $payment['contribution_id'],
+        ));
+        $member = array(
+          'qty' => NULL,
+          'unit_price' => NULL,
+          'line_total' => NULL,
+          'tax_amount' => NULL,
+        );
+        $nonmember = array(
+          'qty' => NULL,
+          'unit_price' => NULL,
+          'line_total' => NULL,
+          'tax_amount' => NULL,
+        );
+        foreach ($lineItems['values'] as $item) {
+          switch($item['price_field_id']) {
+            case '16': // "Member seminar price"
+              $member['qty'] += (int) $item['qty'];
+              $member['unit_price'] += (float) $item['unit_price'];
+              $member['line_total'] += (float) $item['line_total'];
+              $member['tax_amount'] += (float) $item['tax_amount'];
+              break;
+            case '17': // "Non member seminar price"
+              $nonmember['qty'] += (int) $item['qty'];
+              $nonmember['unit_price'] += (float) $item['unit_price'];
+              $nonmember['line_total'] += (float) $item['line_total'];
+              $nonmember['tax_amount'] += (float) $item['tax_amount'];
+              break;
+            case '18': // "Member recording price"
+              $member['qty'] += (int) $item['qty'];
+              $member['unit_price'] += (float) $item['unit_price'];
+              $member['line_total'] += (float) $item['line_total'];
+              $member['tax_amount'] += (float) $item['tax_amount'];
+              break;
+            case '19': // "Non member recording price"
+              $nonmember['qty'] += (int) $item['qty'];
+              $nonmember['unit_price'] += (float) $item['unit_price'];
+              $nonmember['line_total'] += (float) $item['line_total'];
+              $nonmember['tax_amount'] += (float) $item['tax_amount'];
+              break;
+          }
+        }
+        $total = array(
+          'qty' => $member['qty'] + $nonmember['qty'],
+          'unit_price' => $member['unit_price'] + $nonmember['unit_price'],
+          'line_total' => $member['line_total'] + $nonmember['line_total'],
+          'tax_amount' => $member['tax_amount'] + $nonmember['tax_amount'],
+        );
+      }
+
+      $event = array(
+        'event.type' => CRM_Utils_Array::value('event_type', $participantRecord),
+        'event.name' => CRM_Utils_Array::value('event_title', $participantRecord),
+        'event.membertickets' => $member['qty'],
+        'event.nonmembertickets' => $nonmember['qty'],
+        'event.membernetamount' => CRM_Utils_Money::format($member['line_total']),
+        'event.membertaxamount' => CRM_Utils_Money::format($member['tax_amount']),
+        'event.membertotalamount' => CRM_Utils_Money::format($member['line_total'] + $member['tax_amount']),
+        'event.nonmembernetamount' => CRM_Utils_Money::format($nonmember['line_total']),
+        'event.nonmembertaxamount' => CRM_Utils_Money::format($nonmember['tax_amount']),
+        'event.nonmembertotalamount' => CRM_Utils_Money::format($nonmember['line_total'] + $nonmember['tax_amount']),
+        'event.totaltickets' => $member['qty'] + $nonmember['qty'],
+        'event.totalnetamount' => CRM_Utils_Money::format($total['line_total']),
+        'event.totaltaxamount' => CRM_Utils_Money::format($total['tax_amount']),
+        'event.totalamount' => CRM_Utils_Money::format($total['line_total'] + $total['tax_amount']),
+      );
+
+      foreach ($cids as $cid) {
+        $values[$cid] = empty($values[$cid]) ? $event : $values[$cid] + $event;
+      }
+    }
+  }
+}
+
+function aor_civicrm_links($op, $objectName, $objectId, &$links, &$mask, &$values) {
+  //create a Send Invoice link with the context of the participant's order ID (a custom participant field)
+  switch ($objectName) {
+    case 'Membership':
+      switch ($op) {
+        case 'membership.tab.row':
+          $mid = $values['id'];
+          $cid = $values['cid'];
+
+          $mtid = NULL;
+          if (_aor_is_membership($mid)) {
+            $mtid = 131;
+          }
+          $mtid = 131;
+          if ($mtid) {
+            $links[] = array(
+              'name' => ts('Print Letter'),
+              'title' => ts('Print Letter'),
+              'url' => 'civicrm/activity/pdf/printsingle',
+              'qs' => "action=add&reset=1&cid=$cid&selectedChild=member&mtid={$mtid}&mid={$mid}",
+            );
+          }
+      }
+      break;
+    case 'Participant':
+      switch ($op) {
+        case 'participant.selector.row':
+          $cid = $values['cid'];
+          $pid = $values['id'];
+          try {
+            $participantRecord = civicrm_api3('Participant', 'getsingle', array('id' => $pid));
+            switch ($participantRecord) {
+              case 'Recording':
+                $mtid = 89;
+                break;
+              case 'Seminar':
+                $mtid = 88;
+                break;
+            }
+
+            if ($mtid) {
+              $links[] = array(
+                'name' => ts('Print Letter'),
+                'title' => ts('Print Letter'),
+                'url' => 'civicrm/activity/pdf/printsingle',
+                'qs' => "action=add&reset=1&cid=$cid&selectedChild=participant&mtid={$mtid}&pid={$pid}",
+              );
+            }
+          }
+          catch (Exception $e) {
+            continue;
+          }
+          break;
+      }
+  }
+}
+
 /**
  * Clear membership number field for all memberships for contact id.
  * @param $cid
@@ -523,4 +694,29 @@ function cpdcourseid_get_custom_field()
     $_cpdcourseid_custom_field = civicrm_api3('CustomField', 'getsingle', array('name' => "CPD_Course_ID"));
   }
   return $_cpdcourseid_custom_field;
+}
+
+function _aor_is_membership($mid) {
+  $params = array(
+    'id' => $mid,
+    'api.membership_type.getsingle' => 1,
+    'options' => array('limit' => 1, 'sort' => 'end_date DESC'),
+  );
+
+  // Only get memberships with financial type "Member Dues"
+  $membershipTypes = civicrm_api3('MembershipType', 'get', array(
+    'financial_type_id' => _aor_getMembershipFinancialTypes(),
+  ));
+  foreach ($membershipTypes['values'] as $typeId => $val) {
+    $types[] = $val['name'];
+  }
+  $params['membership_type_id'] = array('IN' => $types);
+
+  try {
+    $membership = civicrm_api3('membership', 'getsingle', $params);
+  }
+  catch (Exception $e) {
+    return FALSE;
+  }
+  return TRUE;
 }
