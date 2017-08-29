@@ -553,7 +553,7 @@ function aor_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array()
     );
 
     foreach ($cids as $cid) {
-      $values[$cid] = empty($values[$cid]) ? $event : $values[$cid] + $event;
+      $values[$cid] = empty($values[$cid]) ? $cpd : $values[$cid] + $cpd;
     }
   }
 }
