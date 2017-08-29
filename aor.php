@@ -562,7 +562,7 @@ function aor_civicrm_links($op, $objectName, $objectId, &$links, &$mask, &$value
           $pid = $values['id'];
           try {
             $participantRecord = civicrm_api3('Participant', 'getsingle', array('id' => $pid));
-            switch ($participantRecord) {
+            switch ($participantRecord['event_type']) {
               case 'Recording':
                 $mtid = 89;
                 break;
