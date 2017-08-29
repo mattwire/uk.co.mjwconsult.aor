@@ -628,7 +628,7 @@ function _aor_civicrm_clearMembershipsMembershipNo($cid) {
   if (!empty($memberships['count'])) {
     foreach ($memberships['values'] as $membership) {
       if (!empty($membership[_aor_getMembershipNoCustomField()])) {
-        $membership[_aor_getMembershipNoCustomField()] = '';
+        $membership[_aor_getMembershipNoCustomField()] = NULL;
         civicrm_api3('Membership', 'create', $membership);
       }
     }
