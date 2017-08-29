@@ -438,11 +438,15 @@ function aor_civicrm_tokens( &$tokens ) {
     'event.totalamount' => ts("Total Amount"),
   );
 
-  $tokens['cpd'] = array(
-    'cpd.course_name' => ts('CPD Course Name'),
-    'cpd.end_date' => ts('CPD End Date'),
-    'cpd.start_date' => ts('CPD Start Date'),
-    'cpd.join_date' => ts('CPD Join Date'),
+  $tokens['membership'] = array(
+    'membership.course_name' => ts('Membership Course Name'),
+    'membership.end_date' => ts('Membership End Date'),
+    'membership.start_date' => ts('Membership Start Date'),
+    'membership.join_date' => ts('Membership Join Date'),
+    'membership.qty' => ts("Membership Qty"),
+    'membership.totalnetamount' => ts("Membership Total Net Amount"),
+    'membership.totaltaxamount' => ts("Membership Total Tax Amount"),
+    'membership.totalamount' => ts("Membership Total Amount"),
   );
 }
 
@@ -541,9 +545,6 @@ function aor_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array()
   }
   if (!empty($tokens['cpd'])) {
     $mid = CRM_Utils_Request::getValue('membership_id', $_REQUEST);
-    if (!_aor_is_cpd_membership($mid)) {
-      return;
-    }
 
     try {
       $membershipRecord = civicrm_api3('Membership', 'getsingle', array('id' => $mid));
@@ -551,15 +552,49 @@ function aor_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array()
     catch (Exception $e) {
       return;
     }
-    $cpd = array(
-      'cpd.course_name' => CRM_Utils_Array::value('custom_34', $membershipRecord),
-      'cpd.end_date' => CRM_Utils_Array::value('end_date', $membershipRecord),
-      'cpd.start_date' => CRM_Utils_Array::value('start_date', $membershipRecord),
-      'cpd.join_date' => CRM_Utils_Array::value('join_date', $membershipRecord),
+
+    $membershipPayments = civicrm_api3('MembershipPayment', 'get', array(
+      'membership_id' => $mid,
+    ));
+
+    $member = $total = array();
+    foreach ($membershipPayments['values'] as $payment) {
+      $lineItems = civicrm_api3('LineItem', 'get', array(
+        'contribution_id' => $payment['contribution_id'],
+      ));
+      $member = array(
+        'qty' => NULL,
+        'unit_price' => NULL,
+        'line_total' => NULL,
+        'tax_amount' => NULL,
+      );
+      foreach ($lineItems['values'] as $item) {
+        $member['qty'] += (int) $item['qty'];
+        $member['unit_price'] += (float) $item['unit_price'];
+        $member['line_total'] += (float) $item['line_total'];
+        $member['tax_amount'] += (float) $item['tax_amount'];
+      }
+      $total = array(
+        'qty' => $member['qty'],
+        'unit_price' => $member['unit_price'],
+        'line_total' => $member['line_total'],
+        'tax_amount' => $member['tax_amount'],
+      );
+    }
+
+    $membership = array(
+      'membership.course_name' => CRM_Utils_Array::value('custom_34', $membershipRecord),
+      'membership.end_date' => CRM_Utils_Array::value('end_date', $membershipRecord),
+      'membership.start_date' => CRM_Utils_Array::value('start_date', $membershipRecord),
+      'membership.join_date' => CRM_Utils_Array::value('join_date', $membershipRecord),
+      'membership.qty' => $member['qty'],
+      'membership.totalnetamount' => CRM_Utils_Money::format($total['line_total']),
+      'membership.totaltaxamount' => CRM_Utils_Money::format($total['tax_amount']),
+      'membership.totalamount' => CRM_Utils_Money::format($total['line_total'] + $total['tax_amount']),
     );
 
     foreach ($cids as $cid) {
-      $values[$cid] = empty($values[$cid]) ? $cpd : $values[$cid] + $cpd;
+      $values[$cid] = empty($values[$cid]) ? $membership : $values[$cid] + $membership;
     }
   }
 }
