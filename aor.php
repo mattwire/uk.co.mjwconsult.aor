@@ -413,7 +413,8 @@ function aor_civicrm_pageRun( &$page ) {
     _aor_civicrm_addContactMembershipNumberToMembership(_aor_civicrm_getLatestMembership($contact['id']));
     if ($updatedContact) {
       // Refresh the contact summary
-      CRM_Utils_System::redirect($_SERVER['REQUEST_URI']);
+      $url = CRM_Utils_System::url('civicrm/contact/view', "reset=1&cid={$contactId}");
+      CRM_Utils_System::redirect($url);
     }
   }
 }
