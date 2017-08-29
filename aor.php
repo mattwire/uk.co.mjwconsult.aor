@@ -474,25 +474,25 @@ function aor_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array()
         );
         foreach ($lineItems['values'] as $item) {
           switch($item['price_field_id']) {
-            case '16': // "Member seminar price"
+            case '48': // "Member seminar price"
               $member['qty'] += (int) $item['qty'];
               $member['unit_price'] += (float) $item['unit_price'];
               $member['line_total'] += (float) $item['line_total'];
               $member['tax_amount'] += (float) $item['tax_amount'];
               break;
-            case '17': // "Non member seminar price"
+            /*case '17': // "Non member seminar price"
               $nonmember['qty'] += (int) $item['qty'];
               $nonmember['unit_price'] += (float) $item['unit_price'];
               $nonmember['line_total'] += (float) $item['line_total'];
               $nonmember['tax_amount'] += (float) $item['tax_amount'];
-              break;
-            case '18': // "Member recording price"
+              break;*/
+            case '56': // "Member recording price"
               $member['qty'] += (int) $item['qty'];
               $member['unit_price'] += (float) $item['unit_price'];
               $member['line_total'] += (float) $item['line_total'];
               $member['tax_amount'] += (float) $item['tax_amount'];
               break;
-            case '19': // "Non member recording price"
+            case '58': // "Non member recording price"
               $nonmember['qty'] += (int) $item['qty'];
               $nonmember['unit_price'] += (float) $item['unit_price'];
               $nonmember['line_total'] += (float) $item['line_total'];
