@@ -449,11 +449,11 @@ function aor_civicrm_tokens( &$tokens ) {
 function aor_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array(), $context = null) {
   // Event tokens
   if (!empty($tokens['event'])) {
-    $pId = CRM_Utils_Request::getValue('participant_id', $_REQUEST);
-    if ($pId) {
+    $pid = CRM_Utils_Request::getValue('participant_id', $_REQUEST);
+    if ($pid) {
       try {
         $participantRecord = civicrm_api3('Participant', 'getsingle', array(
-          'id' => $pId,
+          'id' => $pid,
         ));
       }
       catch (Exception $e) {
@@ -461,7 +461,7 @@ function aor_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array()
       }
 
       $participantPayments = civicrm_api3('ParticipantPayment', 'get', array(
-        'participant_id' => $pId,
+        'participant_id' => $pid,
       ));
 
       $member = $nonmember = $total = array();
@@ -541,6 +541,10 @@ function aor_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array()
   }
   if (!empty($tokens['cpd'])) {
     $mid = CRM_Utils_Request::getValue('membership_id', $_REQUEST);
+    if (!_aor_is_cpd_membership($mid)) {
+      return;
+    }
+
     try {
       $membershipRecord = civicrm_api3('Membership', 'getsingle', array('id' => $mid));
     }
@@ -569,21 +573,18 @@ function aor_civicrm_links($op, $objectName, $objectId, &$links, &$mask, &$value
           $mid = $values['id'];
           $cid = $values['cid'];
 
-          $mtid = NULL;
-          if (_aor_is_membership($mid)) {
-            $mtid = 131;
-          }
-          elseif (_aor_is_cpd_membership($mid)) {
-            $mtid = 107;
-          }
-          if ($mtid) {
-            $links[] = array(
-              'name' => ts('Print Letter'),
-              'title' => ts('Print Letter'),
-              'url' => 'civicrm/activity/pdf/printsingle',
-              'qs' => "action=add&reset=1&cid=$cid&selectedChild=member&mtid={$mtid}&mid={$mid}",
-            );
-          }
+          $links[] = array(
+            'name' => ts('Print Letter'),
+            'title' => ts('Print Letter'),
+            'url' => 'civicrm/activity/pdf/add',
+            'qs' => "action=add&reset=1&cid={$cid}&selectedChild=activity&atype=22&pid={$mid}",
+          );
+          $links[] = array(
+            'name' => ts('Send Email'),
+            'title' => ts('Send Email'),
+            'url' => 'civicrm/activity/email/add',
+            'qs' => "action=add&reset=1&cid={$cid}&selectedChild=activity&atype=3&pid={$mid}",
+          );
       }
       break;
     case 'Participant':
@@ -591,29 +592,19 @@ function aor_civicrm_links($op, $objectName, $objectId, &$links, &$mask, &$value
         case 'participant.selector.row':
           $cid = $values['cid'];
           $pid = $values['id'];
-          try {
-            $participantRecord = civicrm_api3('Participant', 'getsingle', array('id' => $pid));
-            switch ($participantRecord['event_type']) {
-              case 'Recording':
-                $mtid = 90;
-                break;
-              case 'Seminar':
-                $mtid = 70;
-                break;
-            }
 
-            if ($mtid) {
-              $links[] = array(
-                'name' => ts('Print Letter'),
-                'title' => ts('Print Letter'),
-                'url' => 'civicrm/activity/pdf/printsingle',
-                'qs' => "action=add&reset=1&cid=$cid&selectedChild=participant&mtid={$mtid}&pid={$pid}",
-              );
-            }
-          }
-          catch (Exception $e) {
-            continue;
-          }
+          $links[] = array(
+            'name' => ts('Print Letter'),
+            'title' => ts('Print Letter'),
+            'url' => 'civicrm/activity/pdf/add',
+            'qs' => "action=add&reset=1&cid={$cid}&selectedChild=activity&atype=22&pid={$pid}",
+          );
+          $links[] = array(
+            'name' => ts('Send Email'),
+            'title' => ts('Send Email'),
+            'url' => 'civicrm/activity/email/add',
+            'qs' => "action=add&reset=1&cid={$cid}&selectedChild=activity&atype=3&pid={$pid}",
+          );
           break;
       }
   }
@@ -677,9 +668,24 @@ function _aor_civicrm_getLatestMembership($cid) {
 }
 
 function aor_civicrm_buildForm($formName, &$form) {
+  $bob =1;
   switch ($formName) {
     case 'CRM_Event_Form_ManageEvent_Location':
-      CRM_Core_Resources::singleton()->addScriptFile('uk.co.mjwconsult.aor', 'js/address.js');
+      Civi::resources()->addScriptFile('uk.co.mjwconsult.aor', 'js/address.js');
+      break;
+    case 'CRM_Contact_Form_Task_Email':
+    case 'CRM_Contact_Form_Task_PDF':
+      $pid = CRM_Utils_Request::getValue('pid', $_REQUEST);
+      $mid = CRM_Utils_Request::getValue('mid', $_REQUEST);
+      $form->add('hidden', 'participant_id');
+      $form->add('hidden', 'membership_id');
+      // dynamically insert a template block in the page
+      CRM_Core_Region::instance('page-body')->add(array(
+        'template' => "CRM/aor/hiddenfields.tpl"
+      ));
+      $defaults['participant_id'] = $pid;
+      $defaults['membership_id'] = $mid;
+      $form->setDefaults($defaults);
       break;
   }
 }
