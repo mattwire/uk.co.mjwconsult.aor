@@ -435,6 +435,13 @@ function aor_civicrm_tokens( &$tokens ) {
     'event.totaltaxamount' => ts("Total Tax Amount"),
     'event.totalamount' => ts("Total Amount"),
   );
+
+  $tokens['cpd'] = array(
+    'cpd.course_name' => ts('CPD Course Name'),
+    'cpd.end_date' => ts('CPD End Date'),
+    'cpd.start_date' => ts('CPD Start Date'),
+    'cpd.join_date' => ts('CPD Join Date'),
+  );
 }
 
 function aor_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array(), $context = null) {
@@ -530,6 +537,25 @@ function aor_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array()
       }
     }
   }
+  if (!empty($tokens['cpd'])) {
+    $mid = CRM_Utils_Request::getValue('membership_id', $_REQUEST);
+    try {
+      $membershipRecord = civicrm_api3('Membership', 'getsingle', array('id' => $mid));
+    }
+    catch (Exception $e) {
+      return;
+    }
+    $cpd = array(
+      'cpd.course_name' => CRM_Utils_Array::value('custom_34', $membershipRecord),
+      'cpd.end_date' => CRM_Utils_Array::value('end_date', $membershipRecord),
+      'cpd.start_date' => CRM_Utils_Array::value('start_date', $membershipRecord),
+      'cpd.join_date' => CRM_Utils_Array::value('join_date', $membershipRecord),
+    );
+
+    foreach ($cids as $cid) {
+      $values[$cid] = empty($values[$cid]) ? $event : $values[$cid] + $event;
+    }
+  }
 }
 
 function aor_civicrm_links($op, $objectName, $objectId, &$links, &$mask, &$values) {
@@ -544,6 +570,9 @@ function aor_civicrm_links($op, $objectName, $objectId, &$links, &$mask, &$value
           $mtid = NULL;
           if (_aor_is_membership($mid)) {
             $mtid = 131;
+          }
+          elseif (_aor_is_cpd_membership($mid)) {
+            $mtid = 107;
           }
           if ($mtid) {
             $links[] = array(
@@ -699,7 +728,6 @@ function _aor_is_membership($mid) {
   $params = array(
     'id' => $mid,
     'api.membership_type.getsingle' => 1,
-    'options' => array('limit' => 1, 'sort' => 'end_date DESC'),
   );
 
   // Only get memberships with financial type "Member Dues"
@@ -710,6 +738,24 @@ function _aor_is_membership($mid) {
     $types[] = $val['name'];
   }
   $params['membership_type_id'] = array('IN' => $types);
+
+  try {
+    $membership = civicrm_api3('membership', 'getsingle', $params);
+  }
+  catch (Exception $e) {
+    return FALSE;
+  }
+  return TRUE;
+}
+
+function _aor_is_cpd_membership($mid) {
+  $params = array(
+    'id' => $mid,
+    'api.membership_type.getsingle' => 1,
+  );
+
+  // Only get memberships with type "CPD"
+  $params['membership_type_id'] = "CPD";
 
   try {
     $membership = civicrm_api3('membership', 'getsingle', $params);
