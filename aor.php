@@ -338,7 +338,7 @@ Civi::log()->info($op);
       }
       Civi::log()->info('Adding callback');
       CRM_Core_Transaction::addCallback(CRM_Core_Transaction::PHASE_POST_COMMIT,
-        '_aor_civicrm_addContactMembershipNumberToMembership', array($membership));
+        '_aor_civicrm_addContactMembershipNumberToMembership', array(_aor_civicrm_getLatestMembership($membership['contact_id'])));
       break;
   }
 }
@@ -717,7 +717,6 @@ function _aor_civicrm_clearMembershipsMembershipNo($cid, $excludeId = NULL) {
  */
 function _aor_civicrm_getLatestMembership($cid) {
   $params = array(
-    'version' => 3,
     'contact_id' => $cid,
     'sequential' => 1,
     'api.membership_type.getsingle' => 1,
