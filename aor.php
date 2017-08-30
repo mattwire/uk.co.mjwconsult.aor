@@ -275,8 +275,10 @@ function aor_civicrm_pre($op, $objectName, $objectId, &$objectRef) {
  * @param $objectRef
  */
 function aor_civicrm_post($op, $objectName, $objectId, &$objectRef) {
+Civi::log()->info($objectName);
   switch ($objectName) {
     case 'Membership':
+      Civi::log()->info('membership');
       _aor_civicrm_postUpdateMembership($op, $objectRef);
       break;
   }
@@ -313,8 +315,10 @@ function _aor_civicrm_preUpdateContact($op, $objectId, &$objectRef) {
  * @param $objectRef
  */
 function _aor_civicrm_postUpdateMembership($op, &$objectRef) {
+Civi::log()->info($op);
   switch ($op) {
     case 'create':
+//    case 'edit':
     case 'restore':
       try {
         $membership = civicrm_api3('Membership', 'getsingle', array('id' => $objectRef->id));
@@ -322,6 +326,7 @@ function _aor_civicrm_postUpdateMembership($op, &$objectRef) {
       catch (Exception $e) {
         return;
       }
+      Civi::log()->info('Adding callback');
       CRM_Core_Transaction::addCallback(CRM_Core_Transaction::PHASE_POST_COMMIT,
         '_aor_civicrm_addContactMembershipNumberToMembership', array($membership));
       break;
@@ -370,6 +375,7 @@ function _aor_civicrm_addContactMembershipNumber($contact, $commit) {
  * @return null
  */
 function _aor_civicrm_addContactMembershipNumberToMembership($membership) {
+  Civi::log()->info('addContactMembershipNumberToMembership triggered');
   try {
     $contact = civicrm_api3('Contact', 'getsingle', array(
       'id' => $membership['contact_id'],
@@ -381,11 +387,16 @@ function _aor_civicrm_addContactMembershipNumberToMembership($membership) {
   }
 
   // if custom_35 already set, don't set it again
+  $excludeId = NULL;
   if ($membership[_aor_getMembershipNoCustomField()] == $contact['external_identifier']) {
-    return NULL;
+    $excludeId = $membership['id'];
   }
   // Clear membership numbers from all other memberships
-  _aor_civicrm_clearMembershipsMembershipNo($membership['contact_id']);
+  _aor_civicrm_clearMembershipsMembershipNo($membership['contact_id'], $excludeId);
+
+  if ($excludeId) {
+    return NULL;
+  }
 
   $membership[_aor_getMembershipNoCustomField()] = $contact['external_identifier'];
 
@@ -649,26 +660,30 @@ function aor_civicrm_links($op, $objectName, $objectId, &$links, &$mask, &$value
  * Clear membership number field for all memberships for contact id.
  * @param $cid
  */
-function _aor_civicrm_clearMembershipsMembershipNo($cid) {
-  $lockfile = sys_get_temp_dir() . '/aor_civicrm_clearmembershipnumber.lock';
-  if (file_exists($lockfile)) {
-    return NULL;
-  }
-
+function _aor_civicrm_clearMembershipsMembershipNo($cid, $excludeId = NULL) {
   $memberships = civicrm_api3('Membership', 'get', array('contact_id' => $cid));
+  Civi::log()->info('Membership count: ' . $memberships['count']);
   if (!empty($memberships['count'])) {
     foreach ($memberships['values'] as $membership) {
+      if ($membership['id'] == $excludeId) {
+        Civi::log()->info('Excluding membership already set ' . $excludeId);
+        continue;
+      }
+      else {
+        Civi::log()->info('Processing clear membership ' . $membership['id']);
+      }
       foreach ($membership as $key => $value) {
+        $changed = FALSE;
         if (substr($key, 0, strlen(_aor_getMembershipNoCustomField())) === _aor_getMembershipNoCustomField()) {
+	  Civi::log()->info('match on ' . $key . ' with value :' .$value );
           if (!empty($value)) {
             $membership[$key] = NULL;
+            $changed = TRUE;
           }
         }
-        $lockfile = sys_get_temp_dir() . '/aor_civicrm_clearmembershipnumber.lock';
-        $fp = fopen($lockfile, "r+");
-        if (flock($fp, LOCK_EX)) {  // acquire an exclusive lock
+        if ($changed) {
+          Civi::log()->warning('updating membership');
           civicrm_api3('Membership', 'create', $membership);
-          flock($fp, LOCK_UN);    // release the lock
         }
       }
     }
