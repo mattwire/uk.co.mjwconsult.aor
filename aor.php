@@ -275,10 +275,8 @@ function aor_civicrm_pre($op, $objectName, $objectId, &$objectRef) {
  * @param $objectRef
  */
 function aor_civicrm_post($op, $objectName, $objectId, &$objectRef) {
-Civi::log()->info($objectName);
   switch ($objectName) {
     case 'Membership':
-      Civi::log()->info('membership');
       _aor_civicrm_postUpdateMembership($op, $objectRef);
       break;
   }
@@ -687,23 +685,23 @@ function _aor_civicrm_clearMembershipsMembershipNo($cid, $excludeId = NULL) {
   if (!empty($memberships['count'])) {
     foreach ($memberships['values'] as $membership) {
       if ($membership['id'] == $excludeId) {
-        Civi::log()->info('Excluding membership already set ' . $excludeId);
+        Civi::log()->info($membership['id'] . ': Excluding membership already set');
         continue;
       }
       else {
-        Civi::log()->info('Processing clear membership ' . $membership['id']);
+        Civi::log()->info($membership['id'] . ': Processing clear membership');
       }
       foreach ($membership as $key => $value) {
         $changed = FALSE;
         if (substr($key, 0, strlen(_aor_getMembershipNoCustomField())) === _aor_getMembershipNoCustomField()) {
-	        Civi::log()->info('match on ' . $key . ' with value :' .$value );
+	        Civi::log()->info($membership['id'] . ': Match on ' . $key . ' with value :' .$value );
           if (!empty($value)) {
             $membership[$key] = NULL;
             $changed = TRUE;
           }
         }
         if ($changed) {
-          Civi::log()->warning('updating membership');
+          Civi::log()->info($membership['id'] . ': Updating membership');
           civicrm_api3('Membership', 'create', $membership);
         }
       }
