@@ -351,7 +351,18 @@ Civi::log()->info($op);
  * @return array|null
  */
 function _aor_civicrm_addContactMembershipNumber($contact, $commit) {
-  if (!empty($contact['external_identifier'])) {
+  if (isset($contact['contact_id'])) {
+    $params['id'] = $contact['contact_id'];
+  }
+  elseif (isset($contact['id'])) {
+    $params['id'] = $contact['id'];
+  }
+  else {
+    Civi::log()->info('No contact ID found - cannot add external_identifier');
+    return NULL;
+  }
+  $contactRecord = civicrm_api3('Contact', 'getsingle', array('id' => $contact['contact_id']));
+  if (!empty($contactRecord['external_identifier'])) {
     Civi::log()->info($contact['id'] . ': Already has external_identifier set');
     return NULL;
   }
