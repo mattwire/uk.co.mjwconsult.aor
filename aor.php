@@ -307,7 +307,9 @@ function _aor_civicrm_preUpdateContact($op, $objectId, &$objectRef) {
 }
 
 function _aor_civicrm_getLockFile($filename) {
-  return sys_get_temp_dir() . "/{$filename}.lock";
+  $lockfile = sys_get_temp_dir() . "/{$filename}.lock";
+  Civi::log()->info($lockfile);
+  return $lockfile;
 }
 
 function _aor_civicrm_releaseLock($lockFP) {
@@ -355,8 +357,8 @@ function _aor_civicrm_addContactMembershipNumber($contact, $commit) {
     return NULL;
   }
 
-  $lockfile = sys_get_temp_dir() . '/aor_civicrm_addcontactmembershipnumber.lock';
-  $fp = fopen($lockfile, "r+");
+  $lockfile = _aor_civicrm_getLockFile('aor_civicrm_addcontactmembershipnumber');
+  $fp = fopen($lockfile, "w+");
   if (flock($fp, LOCK_EX)) {  // acquire an exclusive lock
     $nextMembershipNo = CRM_Aor_Utils::getSettings('aor_next_membership_number');
     if ($nextMembershipNo > 499999) {
@@ -385,7 +387,7 @@ function _aor_civicrm_addContactMembershipNumber($contact, $commit) {
  * @return null
  */
 function _aor_civicrm_addContactMembershipNumberToMembership($membership) {
-  $lockFP = fopen(_aor_civicrm_getLockFile('addcontactmembershipnumbertomembership'), 'r+');
+  $lockFP = fopen(_aor_civicrm_getLockFile('addcontactmembershipnumbertomembership'), 'w+');
   if (!flock($lockFP, LOCK_EX|LOCK_NB)) {
     Civi::log()->info('Not updating membership numbers, lock in progress');
     return;
