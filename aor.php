@@ -405,7 +405,7 @@ function _aor_civicrm_addContactMembershipNumberToMembership($membership) {
 
   // if custom_35 already set, don't set it again
   $excludeId = NULL;
-  if ($membership[_aor_getMembershipNoCustomField()] == $contact['external_identifier']) {
+  if (isset($membership[_aor_getMembershipNoCustomField()]) && ($membership[_aor_getMembershipNoCustomField()] == $contact['external_identifier'])) {
     $excludeId = $membership['id'];
   }
   // Clear membership numbers from all other memberships
