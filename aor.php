@@ -352,12 +352,14 @@ Civi::log()->info($op);
  */
 function _aor_civicrm_addContactMembershipNumber($contact, $commit) {
   if (!empty($contact['external_identifier'])) {
+    Civi::log()->info($contact['id'] . ': Already has external_identifier set');
     return NULL;
   }
 
   $lockfile = _aor_civicrm_getLockFile('aor_civicrm_addcontactmembershipnumber');
   $fp = fopen($lockfile, "w+");
   if (flock($fp, LOCK_EX)) {  // acquire an exclusive lock
+    Civi::log()->info($contact['id'] . ': Got lock for new membership number');
     $nextMembershipNo = CRM_Aor_Utils::getSettings('aor_next_membership_number');
     if ($nextMembershipNo > 499999) {
       Civi::log()
@@ -368,6 +370,7 @@ function _aor_civicrm_addContactMembershipNumber($contact, $commit) {
 
     $contact['external_identifier'] = $nextMembershipNo;
     if ($commit) {
+      Civi::log()->info($contact['id'] . ': Saving new membership number');
       $contact = civicrm_api3('Contact', 'create', $contact);
     }
     // Save the next available membership number
