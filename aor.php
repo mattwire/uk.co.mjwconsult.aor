@@ -694,9 +694,9 @@ function _aor_civicrm_clearMembershipsMembershipNo($cid, $excludeId = NULL) {
       foreach ($membership as $key => $value) {
         $changed = FALSE;
         if (substr($key, 0, strlen(_aor_getMembershipNoCustomField())) === _aor_getMembershipNoCustomField()) {
-	        Civi::log()->info($membership['id'] . ': Match on ' . $key . ' with value :' .$value );
+	        Civi::log()->info($membership['id'] . ': Match on ' . $key . ' with value: ' .$value );
           if (!empty($value)) {
-            $membership[$key] = NULL;
+            $membership[$key] = '';
             $changed = TRUE;
           }
         }
