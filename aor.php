@@ -306,6 +306,16 @@ function _aor_civicrm_preUpdateContact($op, $objectId, &$objectRef) {
   }
 }
 
+function _aor_civicrm_getLockFile($filename) {
+  return sys_get_temp_dir() . "/{$filename}.lock";
+}
+
+function _aor_civicrm_releaseLock($lockFP) {
+  Civi::log()->info('Release lock');
+  flock($lockFP, LOCK_UN);
+  fclose($lockFP);
+}
+
 /**
  * Membership handler for hook_civicrm_post
  * We add the external id (membership number) to the latest current membership here.
@@ -317,8 +327,8 @@ function _aor_civicrm_preUpdateContact($op, $objectId, &$objectRef) {
 function _aor_civicrm_postUpdateMembership($op, &$objectRef) {
 Civi::log()->info($op);
   switch ($op) {
+    case 'edit':
     case 'create':
-//    case 'edit':
     case 'restore':
       try {
         $membership = civicrm_api3('Membership', 'getsingle', array('id' => $objectRef->id));
@@ -375,6 +385,12 @@ function _aor_civicrm_addContactMembershipNumber($contact, $commit) {
  * @return null
  */
 function _aor_civicrm_addContactMembershipNumberToMembership($membership) {
+  $lockFP = fopen(_aor_civicrm_getLockFile('addcontactmembershipnumbertomembership'), 'r+');
+  if (!flock($lockFP, LOCK_EX|LOCK_NB)) {
+    Civi::log()->info('Not updating membership numbers, lock in progress');
+    return;
+  }
+
   Civi::log()->info('addContactMembershipNumberToMembership triggered');
   try {
     $contact = civicrm_api3('Contact', 'getsingle', array(
@@ -383,6 +399,7 @@ function _aor_civicrm_addContactMembershipNumberToMembership($membership) {
   }
   catch (Exception $e) {
     Civi::log()->warning('Could not get contact from membership. ' . $e->getMessage());
+    _aor_civicrm_releaseLock($lockFP);
     return NULL;
   }
 
@@ -395,6 +412,7 @@ function _aor_civicrm_addContactMembershipNumberToMembership($membership) {
   _aor_civicrm_clearMembershipsMembershipNo($membership['contact_id'], $excludeId);
 
   if ($excludeId) {
+    _aor_civicrm_releaseLock($lockFP);
     return NULL;
   }
 
@@ -405,6 +423,7 @@ function _aor_civicrm_addContactMembershipNumberToMembership($membership) {
   } catch (Exception $e) {
     Civi::log()
       ->info('uk.co.mjwconsult.aor: Unable to update field '. _aor_getMembershipNoCustomField() . ' for membership id: ' . (isset($membership['id']) ? $membership['id'] : NULL) . ' Error: ' . $e->getMessage());
+    _aor_civicrm_releaseLock($lockFP);
     return NULL;
   }
 }
@@ -675,7 +694,7 @@ function _aor_civicrm_clearMembershipsMembershipNo($cid, $excludeId = NULL) {
       foreach ($membership as $key => $value) {
         $changed = FALSE;
         if (substr($key, 0, strlen(_aor_getMembershipNoCustomField())) === _aor_getMembershipNoCustomField()) {
-	  Civi::log()->info('match on ' . $key . ' with value :' .$value );
+	        Civi::log()->info('match on ' . $key . ' with value :' .$value );
           if (!empty($value)) {
             $membership[$key] = NULL;
             $changed = TRUE;
