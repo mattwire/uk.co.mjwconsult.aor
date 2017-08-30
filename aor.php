@@ -650,12 +650,26 @@ function aor_civicrm_links($op, $objectName, $objectId, &$links, &$mask, &$value
  * @param $cid
  */
 function _aor_civicrm_clearMembershipsMembershipNo($cid) {
+  $lockfile = sys_get_temp_dir() . '/aor_civicrm_clearmembershipnumber.lock';
+  if (file_exists($lockfile)) {
+    return NULL;
+  }
+
   $memberships = civicrm_api3('Membership', 'get', array('contact_id' => $cid));
   if (!empty($memberships['count'])) {
     foreach ($memberships['values'] as $membership) {
-      if (!empty($membership[_aor_getMembershipNoCustomField()])) {
-        $membership[_aor_getMembershipNoCustomField()] = NULL;
-        civicrm_api3('Membership', 'create', $membership);
+      foreach ($membership as $key => $value) {
+        if (substr($key, 0, strlen(_aor_getMembershipNoCustomField())) === _aor_getMembershipNoCustomField()) {
+          if (!empty($value)) {
+            $membership[$key] = NULL;
+          }
+        }
+        $lockfile = sys_get_temp_dir() . '/aor_civicrm_clearmembershipnumber.lock';
+        $fp = fopen($lockfile, "r+");
+        if (flock($fp, LOCK_EX)) {  // acquire an exclusive lock
+          civicrm_api3('Membership', 'create', $membership);
+          flock($fp, LOCK_UN);    // release the lock
+        }
       }
     }
   }
