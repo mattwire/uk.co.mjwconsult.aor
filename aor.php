@@ -444,6 +444,7 @@ function _aor_civicrm_addContactMembershipNumberToMembership($membership) {
     _aor_civicrm_releaseLock($lockFP);
     return NULL;
   }
+  _aor_civicrm_releaseLock($lockFP);
 }
 
 /**
