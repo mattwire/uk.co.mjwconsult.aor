@@ -10,6 +10,10 @@ function _aor_getMembershipFinancialTypes() {
   return array('IN' => array(2, 42, 72, 81)); // "Member Dues", Historical Member dues, membership inc vat, membership no vat
 }
 
+function _aor_getAdvertiserFinancialTypes() {
+  return array('IN' => array(6, 54)); // "Advertising", Historical Advertising
+}
+
 /**
  * Membership Number custom field for memberships (this is copied from contact external_identifier for the latest current membership only)
  * @return string
@@ -492,6 +496,28 @@ function aor_civicrm_tokens( &$tokens ) {
     'membership.totaltaxamount' => ts("Membership Total Tax Amount"),
     'membership.totalamount' => ts("Membership Total Amount"),
   );
+
+  $tokens['cpd'] = array(
+    'cpd.course_name' => ts('CPD Course Name'),
+    'cpd.end_date' => ts('CPD End Date'),
+    'cpd.start_date' => ts('CPD Start Date'),
+    'cpd.join_date' => ts('CPD Join Date'),
+    'cpd.qty' => ts("CPD Qty"),
+    'cpd.totalnetamount' => ts("CPD Total Net Amount"),
+    'cpd.totaltaxamount' => ts("CPD Total Tax Amount"),
+    'cpd.totalamount' => ts("CPD Total Amount"),
+  );
+
+  $tokens['advertiser'] = array(
+    'advertiser.course_name' => ts('Advertiser Course Name'),
+    'advertiser.end_date' => ts('Advertiser End Date'),
+    'advertiser.start_date' => ts('Advertiser Start Date'),
+    'advertiser.join_date' => ts('Advertiser Join Date'),
+    'advertiser.qty' => ts("Advertiser Qty"),
+    'advertiser.totalnetamount' => ts("Advertiser Total Net Amount"),
+    'advertiser.totaltaxamount' => ts("Advertiser Total Tax Amount"),
+    'advertiser.totalamount' => ts("Advertiser Total Amount"),
+  );
 }
 
 function aor_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array(), $context = null) {
@@ -587,7 +613,8 @@ function aor_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array()
       }
     }
   }
-  if (!empty($tokens['cpd'])) {
+
+  if (!empty($tokens['membership']) || !empty($tokens['cpd']) || !empty($tokens['advertiser'])) {
     $mid = CRM_Utils_Request::getValue('membership_id', $_REQUEST);
 
     try {
@@ -626,16 +653,42 @@ function aor_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array()
       );
     }
 
-    $membership = array(
-      'membership.course_name' => CRM_Utils_Array::value('custom_34', $membershipRecord),
-      'membership.end_date' => CRM_Utils_Array::value('end_date', $membershipRecord),
-      'membership.start_date' => CRM_Utils_Array::value('start_date', $membershipRecord),
-      'membership.join_date' => CRM_Utils_Array::value('join_date', $membershipRecord),
-      'membership.qty' => $member['qty'],
-      'membership.totalnetamount' => CRM_Utils_Money::format($total['line_total']),
-      'membership.totaltaxamount' => CRM_Utils_Money::format($total['tax_amount']),
-      'membership.totalamount' => CRM_Utils_Money::format($total['line_total'] + $total['tax_amount']),
-    );
+    if (_aor_is_membership($mid)) {
+      $membership = array(
+        'membership.course_name' => CRM_Utils_Array::value('custom_34', $membershipRecord),
+        'membership.end_date' => CRM_Utils_Array::value('end_date', $membershipRecord),
+        'membership.start_date' => CRM_Utils_Array::value('start_date', $membershipRecord),
+        'membership.join_date' => CRM_Utils_Array::value('join_date', $membershipRecord),
+        'membership.qty' => $member['qty'],
+        'membership.totalnetamount' => CRM_Utils_Money::format($total['line_total']),
+        'membership.totaltaxamount' => CRM_Utils_Money::format($total['tax_amount']),
+        'membership.totalamount' => CRM_Utils_Money::format($total['line_total'] + $total['tax_amount']),
+      );
+    }
+    elseif (_aor_is_cpd_membership($mid)) {
+      $membership = array(
+        'cpd.course_name' => CRM_Utils_Array::value('custom_34', $membershipRecord),
+        'cpd.end_date' => CRM_Utils_Array::value('end_date', $membershipRecord),
+        'cpd.start_date' => CRM_Utils_Array::value('start_date', $membershipRecord),
+        'cpd.join_date' => CRM_Utils_Array::value('join_date', $membershipRecord),
+        'cpd.qty' => $member['qty'],
+        'cpd.totalnetamount' => CRM_Utils_Money::format($total['line_total']),
+        'cpd.totaltaxamount' => CRM_Utils_Money::format($total['tax_amount']),
+        'cpd.totalamount' => CRM_Utils_Money::format($total['line_total'] + $total['tax_amount']),
+      );
+    }
+    elseif (_aor_is_advertiser_membership($mid)) {
+      $membership = array(
+        'advertiser.course_name' => CRM_Utils_Array::value('custom_34', $membershipRecord),
+        'advertiser.end_date' => CRM_Utils_Array::value('end_date', $membershipRecord),
+        'advertiser.start_date' => CRM_Utils_Array::value('start_date', $membershipRecord),
+        'advertiser.join_date' => CRM_Utils_Array::value('join_date', $membershipRecord),
+        'advertiser.qty' => $member['qty'],
+        'advertiser.totalnetamount' => CRM_Utils_Money::format($total['line_total']),
+        'advertiser.totaltaxamount' => CRM_Utils_Money::format($total['tax_amount']),
+        'advertiser.totalamount' => CRM_Utils_Money::format($total['line_total'] + $total['tax_amount']),
+      );
+    }
 
     foreach ($cids as $cid) {
       $values[$cid] = empty($values[$cid]) ? $membership : $values[$cid] + $membership;
@@ -860,6 +913,30 @@ function _aor_is_cpd_membership($mid) {
 
   // Only get memberships with type "CPD"
   $params['membership_type_id'] = "CPD";
+
+  try {
+    $membership = civicrm_api3('membership', 'getsingle', $params);
+  }
+  catch (Exception $e) {
+    return FALSE;
+  }
+  return TRUE;
+}
+
+function _aor_is_advertiser_membership($mid) {
+  $params = array(
+    'id' => $mid,
+    'api.membership_type.getsingle' => 1,
+  );
+
+  // Only get memberships with financial type "Member Dues"
+  $membershipTypes = civicrm_api3('MembershipType', 'get', array(
+    'financial_type_id' => _aor_getAdvertiserFinancialTypes(),
+  ));
+  foreach ($membershipTypes['values'] as $typeId => $val) {
+    $types[] = $val['name'];
+  }
+  $params['membership_type_id'] = array('IN' => $types);
 
   try {
     $membership = civicrm_api3('membership', 'getsingle', $params);
