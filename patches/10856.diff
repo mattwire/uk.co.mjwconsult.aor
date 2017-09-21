@@ -1,0 +1,76 @@
+diff --git a/CRM/Contribute/Form/Contribution/Confirm.php b/CRM/Contribute/Form/Contribution/Confirm.php
+index e5bfaf06bc0..889b8d6dc67 100644
+--- a/CRM/Contribute/Form/Contribution/Confirm.php
++++ b/CRM/Contribute/Form/Contribution/Confirm.php
+@@ -523,10 +523,11 @@ public function buildQuickForm() {
+       $getTaxDetails = FALSE;
+       $taxTerm = CRM_Utils_Array::value('tax_term', $invoiceSettings);
+       foreach ($this->_lineItem as $key => $value) {
+-        foreach ($value as $v) {
++        foreach ($value as $k => $v) {
+           if (isset($v['tax_rate'])) {
+             if ($v['tax_rate'] != '') {
+               $getTaxDetails = TRUE;
++              $this->_lineItem[$key][$k]['tax_rate'] = (float) $v['tax_rate']; // Cast to float to display without trailing zero decimals
+             }
+           }
+         }
+diff --git a/CRM/Contribute/Form/Contribution/ThankYou.php b/CRM/Contribute/Form/Contribution/ThankYou.php
+index 62dee7c0509..be8430281df 100644
+--- a/CRM/Contribute/Form/Contribution/ThankYou.php
++++ b/CRM/Contribute/Form/Contribution/ThankYou.php
+@@ -98,18 +98,6 @@ public function buildQuickForm() {
+     if ($productID) {
+       CRM_Contribute_BAO_Premium::buildPremiumBlock($this, $this->_id, FALSE, $productID, $option);
+     }
+-    if ($this->_priceSetId && !CRM_Core_DAO::getFieldValue('CRM_Price_DAO_PriceSet', $this->_priceSetId, 'is_quick_config')) {
+-      $this->assign('lineItem', $this->_lineItem);
+-    }
+-    else {
+-      if (is_array($membershipTypeID)) {
+-        $membershipTypeID = current($membershipTypeID);
+-      }
+-      $this->assign('is_quick_config', 1);
+-      $this->_params['is_quick_config'] = 1;
+-    }
+-    $this->assign('priceSetID', $this->_priceSetId);
+-    $this->assign('useForMember', $this->get('useForMember'));
+ 
+     $params = $this->_params;
+     $invoiceSettings = Civi::settings()->get('contribution_invoice_settings');
+@@ -117,11 +105,12 @@ public function buildQuickForm() {
+     if ($invoicing) {
+       $getTaxDetails = FALSE;
+       $taxTerm = CRM_Utils_Array::value('tax_term', $invoiceSettings);
+-      foreach ($this->_lineItem as $value) {
+-        foreach ($value as $v) {
++      foreach ($this->_lineItem as $key => $value) {
++        foreach ($value as $k => $v) {
+           if (isset($v['tax_rate'])) {
+             if ($v['tax_rate'] != '') {
+               $getTaxDetails = TRUE;
++              $this->_lineItem[$key][$k]['tax_rate'] = (float) $v['tax_rate']; // Cast to float to display without trailing zero decimals
+             }
+           }
+         }
+@@ -130,6 +119,20 @@ public function buildQuickForm() {
+       $this->assign('taxTerm', $taxTerm);
+       $this->assign('totalTaxAmount', $params['tax_amount']);
+     }
++
++    if ($this->_priceSetId && !CRM_Core_DAO::getFieldValue('CRM_Price_DAO_PriceSet', $this->_priceSetId, 'is_quick_config')) {
++      $this->assign('lineItem', $this->_lineItem);
++    }
++    else {
++      if (is_array($membershipTypeID)) {
++        $membershipTypeID = current($membershipTypeID);
++      }
++      $this->assign('is_quick_config', 1);
++      $this->_params['is_quick_config'] = 1;
++    }
++    $this->assign('priceSetID', $this->_priceSetId);
++    $this->assign('useForMember', $this->get('useForMember'));
++
+     if (!empty($this->_values['honoree_profile_id']) && !empty($params['soft_credit_type_id'])) {
+       $softCreditTypes = CRM_Core_OptionGroup::values("soft_credit_type", FALSE);
+ 

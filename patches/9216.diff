@@ -1,5 +1,5 @@
 diff --git a/CRM/Contribute/Form/Contribution/Main.php b/CRM/Contribute/Form/Contribution/Main.php
-index 2187147acd2..178d403cfb4 100644
+index 45f66391695..f65a5e53631 100644
 --- a/CRM/Contribute/Form/Contribution/Main.php
 +++ b/CRM/Contribute/Form/Contribution/Main.php
 @@ -243,6 +243,10 @@ public function setDefaultValues() {
@@ -14,7 +14,7 @@ index 2187147acd2..178d403cfb4 100644
          foreach ($this->_priceSet['fields'] as $key => $val) {
            foreach ($val['options'] as $keys => $values) {
 diff --git a/CRM/Member/BAO/Membership.php b/CRM/Member/BAO/Membership.php
-index 7cedc4318c7..6d115e909b8 100644
+index 6ca0ae5a302..df599889aab 100644
 --- a/CRM/Member/BAO/Membership.php
 +++ b/CRM/Member/BAO/Membership.php
 @@ -364,6 +364,8 @@ public static function create(&$params, &$ids, $skipRedirect = FALSE) {
@@ -26,7 +26,7 @@ index 7cedc4318c7..6d115e909b8 100644
      //do cleanup line  items if membership edit the Membership type.
      if (empty($ids['contribution']) && !empty($ids['membership'])) {
        CRM_Price_BAO_LineItem::deleteLineItems($ids['membership'], 'civicrm_membership');
-@@ -2117,7 +2119,9 @@ public function processPriceSet($membershipId, $lineItem) {
+@@ -2137,7 +2139,9 @@ public function processPriceSet($membershipId, $lineItem) {
  
    /**
     * Retrieve the contribution id for the associated Membership id.
@@ -37,7 +37,7 @@ index 7cedc4318c7..6d115e909b8 100644
     *
     * @param int $membershipId
     *   Membership id.
-@@ -2139,10 +2143,14 @@ public static function getMembershipContributionId($membershipId, $all = FALSE)
+@@ -2159,10 +2163,14 @@ public static function getMembershipContributionId($membershipId, $all = FALSE)
        return $contributionIds;
      }
  
@@ -55,7 +55,7 @@ index 7cedc4318c7..6d115e909b8 100644
    }
  
    /**
-@@ -2503,4 +2511,93 @@ public static function getContactsCancelledMembership($contactID, $isTest = FALS
+@@ -2523,4 +2531,93 @@ public static function getContactsCancelledMembership($contactID, $isTest = FALS
      return $cancelledMembershipIds;
    }
  
@@ -150,7 +150,7 @@ index 7cedc4318c7..6d115e909b8 100644
 +
  }
 diff --git a/CRM/Member/Form.php b/CRM/Member/Form.php
-index 7c4196cf7f5..be0fb709e8c 100644
+index 28043d21b26..86fa549325e 100644
 --- a/CRM/Member/Form.php
 +++ b/CRM/Member/Form.php
 @@ -33,7 +33,6 @@
@@ -300,7 +300,7 @@ index 7c4196cf7f5..be0fb709e8c 100644
  
    /**
 diff --git a/CRM/Member/Form/Membership.php b/CRM/Member/Form/Membership.php
-index 8d53bcf3e01..3310cd75c4f 100644
+index 5e640c72607..dd192f80616 100644
 --- a/CRM/Member/Form/Membership.php
 +++ b/CRM/Member/Form/Membership.php
 @@ -173,10 +173,6 @@ public function preProcess() {
@@ -408,7 +408,7 @@ index 8d53bcf3e01..3310cd75c4f 100644
        $this->set('priceSetId', $this->_priceSetId);
        CRM_Price_BAO_PriceSet::buildPriceSet($this);
  
-@@ -442,31 +396,17 @@ public function buildQuickForm() {
+@@ -442,32 +396,22 @@ public function buildQuickForm() {
        $this->assign('contributionType', CRM_Utils_Array::value('financial_type_id', $this->_priceSet));
  
        // get only price set form elements.
@@ -416,22 +416,18 @@ index 8d53bcf3e01..3310cd75c4f 100644
 +      if ($this->_priceSetOnly) {
          return;
        }
-     }
- 
+-    }
+-
 -    // use to build form during form rule.
 -    $this->assign('buildPriceSet', $buildPriceSet);
-+    // use to build form during form rule.  If request was to "_priceSetOnly"
-+    // then we're obviously not in a rule, so we don't need to build price set,
-+    // we we pass FALSE to 'buildPriceSet' argument
-+    $this->assign('buildPriceSet', !$this->_priceSetOnly);
- 
+-
 -    if ($this->_action & CRM_Core_Action::ADD) {
 -      $buildPriceSet = FALSE;
 -      $priceSets = CRM_Price_BAO_PriceSet::getAssoc(FALSE, 'CiviMember');
 -      if (!empty($priceSets)) {
 -        $buildPriceSet = TRUE;
 -      }
--
+ 
 -      if ($buildPriceSet) {
 -        $this->add('select', 'price_set_id', ts('Choose price set'),
 -          array(
@@ -441,13 +437,23 @@ index 8d53bcf3e01..3310cd75c4f 100644
 -        );
 -      }
 -      $this->assign('hasPriceSets', $buildPriceSet);
--    }
-+    $priceSets = $this->assignPriceSet();
++      // buildPriceSet triggers in template:
++      //   * showing price set drop-down, which includes displaying current price set options
++      //   * hiding options to manually select a membership type.
++      // we only want this, when:
++      //   * we've got a price set selected, and
++      //   * we're not asking for "price set only", in which case the assignments above
++      //     is all we needed.
++      $this->assign('buildPriceSet', TRUE);
+     }
  
++    $priceSets = $this->assignPriceSet();
++
      //need to assign custom data type and subtype to the template
      $this->assign('customDataType', 'Membership');
+     $this->assign('customDataSubType', $this->_memType);
 diff --git a/CRM/Member/Form/MembershipRenewal.php b/CRM/Member/Form/MembershipRenewal.php
-index eaf5e212572..12302e95df4 100644
+index eeb0166e1a8..69add0b836f 100644
 --- a/CRM/Member/Form/MembershipRenewal.php
 +++ b/CRM/Member/Form/MembershipRenewal.php
 @@ -143,7 +143,39 @@ public function preProcess() {
@@ -491,45 +497,18 @@ index eaf5e212572..12302e95df4 100644
        $membershipFee = CRM_Core_DAO::getFieldValue('CRM_Member_DAO_MembershipType', $this->_memType, 'minimum_fee');
        if (!$membershipFee) {
          $statusMsg = ts('Membership Renewal using a credit card requires a Membership fee. Since there is no fee associated with the selected membership type, you can use the normal renewal mode.');
-@@ -167,8 +199,36 @@ public function preProcess() {
+@@ -166,9 +198,9 @@ public function preProcess() {
+     parent::preProcess();
    }
  
-   /**
-+   * Determine whether the price set includes memberships of types other than the current membership organisation.
-+   *
-+   * @return bool
-+   */
-+  private function getPriceSetHasNewOrgs() {
-+    if (empty($this->_priceSet)) {
-+      return FALSE;
-+    }
-+    $contactMembershipOrgs = CRM_Member_BAO_Membership::getActiveContactMemberships($this->_contactID);
-+    if (empty($contactMembershipOrgs)) {
-+      return TRUE;
-+    }
-+    foreach ($this->_priceSet['fields'] as $fieldOptions) {
-+      foreach ($fieldOptions['options'] as $fieldValues) {
-+        if (!empty($fieldValues['membership_type_id'])) {
-+          $membershipType = $fieldValues['membership_type_id'];
-+          if ($membershipType) {
-+            $membershipOr = CRM_Member_BAO_MembershipType::getFieldValue("CRM_Member_BAO_MembershipType", $membershipType, 'member_of_contact_id');
-+            if (!in_array($membershipOr, $contactMembershipOrgs)) {
-+              return TRUE;
-+            }
-+          }
-+        }
-+      }
-+    }
-+    return FALSE;
-+  }
 +
-+  /**
+   /**
     * Set default values for the form.
 -   * the default values are retrieved from the database
     *
     * @return array
     *   Default values.
-@@ -176,7 +236,6 @@ public function preProcess() {
+@@ -176,7 +208,6 @@ public function preProcess() {
    public function setDefaultValues() {
  
      $defaults = parent::setDefaultValues();
@@ -537,7 +516,7 @@ index eaf5e212572..12302e95df4 100644
  
      // set renewal_date and receive_date to today in correct input format (setDateDefaults uses today if no value passed)
      list($now, $currentTime) = CRM_Utils_Date::setDateDefaults();
-@@ -184,29 +243,21 @@ public function setDefaultValues() {
+@@ -184,29 +215,21 @@ public function setDefaultValues() {
      $defaults['receive_date'] = $now;
      $defaults['receive_date_time'] = $currentTime;
  
@@ -576,7 +555,7 @@ index eaf5e212572..12302e95df4 100644
      //CRM-13420
      if (empty($defaults['payment_instrument_id'])) {
        $defaults['payment_instrument_id'] = key(CRM_Core_OptionGroup::values('payment_instrument', FALSE, FALSE, FALSE, 'AND is_default = 1'));
-@@ -218,22 +269,12 @@ public function setDefaultValues() {
+@@ -218,22 +241,12 @@ public function setDefaultValues() {
      ), NULL, '%a');
  
      $defaults['record_contribution'] = 0;
@@ -599,7 +578,7 @@ index eaf5e212572..12302e95df4 100644
      return $defaults;
    }
  
-@@ -245,17 +286,18 @@ public function buildQuickForm() {
+@@ -245,17 +258,18 @@ public function buildQuickForm() {
      parent::buildQuickForm();
  
      $defaults = parent::setDefaultValues();
@@ -620,7 +599,7 @@ index eaf5e212572..12302e95df4 100644
  
      $invoiceSettings = Civi::settings()->get('contribution_invoice_settings');
  
-@@ -325,6 +367,7 @@ public function buildQuickForm() {
+@@ -325,6 +339,7 @@ public function buildQuickForm() {
        $selOrgMemType[$index] = $orgMembershipType;
      }
  
@@ -628,14 +607,7 @@ index eaf5e212572..12302e95df4 100644
      $js = array('onChange' => "setPaymentBlock(); CRM.buildCustomData('Membership', this.value);");
      $sel = &$this->addElement('hierselect',
        'membership_type_id',
-@@ -404,32 +447,70 @@ public function buildQuickForm() {
-         );
-       }
-     }
--    $this->addFormRule(array('CRM_Member_Form_MembershipRenewal', 'formRule'));
-+    $this->addFormRule(array('CRM_Member_Form_MembershipRenewal', 'formRule'), $this);
-     $this->addElement('checkbox', 'is_different_contribution_contact', ts('Record Payment from a Different Contact?'));
-     $this->addSelect('soft_credit_type_id', array('entity' => 'contribution_soft'));
+@@ -410,22 +425,59 @@ public function buildQuickForm() {
      $this->addEntityRef('soft_credit_contact_id', ts('Payment From'), array('create' => TRUE));
    }
  
@@ -666,8 +638,6 @@ index eaf5e212572..12302e95df4 100644
 +      // add all elements that are part of price set (these will be hidden to start)
 +      // but will correspond to "last price set used".
 +      CRM_Price_BAO_PriceSet::buildPriceSet($this);
-+
-+      $this->assign('price_set_has_new_orgs', $this->getPriceSetHasNewOrgs());
 +    }
 +
 +  }
@@ -684,8 +654,7 @@ index eaf5e212572..12302e95df4 100644
     * @return bool|array
     *   mixed true or array of errors
     */
--  public static function formRule($params) {
-+  public static function formRule($params, $files, $self) {
+   public static function formRule($params, $files, $self) {
      $errors = array();
 -    if ($params['membership_type_id'][0] == 0) {
 -      $errors['membership_type_id'] = ts('Oops. It looks like you are trying to change the membership type while renewing the membership. Please click the "change membership type" link, and select a Membership Organization.');
@@ -702,13 +671,18 @@ index eaf5e212572..12302e95df4 100644
 +      }
      }
  
+     // CRM-20571
+@@ -441,8 +493,7 @@ public static function formRule($params, $files, $self) {
+       }
+     }
+ 
 -    //total amount condition arise when membership type having no
 -    //minimum fee
 +    //total amount condition arise when membership type having no minimum fee.
      if (isset($params['record_contribution'])) {
        if (!$params['financial_type_id']) {
          $errors['financial_type_id'] = ts('Please select a Financial Type.');
-@@ -441,7 +522,18 @@ public static function formRule($params) {
+@@ -454,7 +505,18 @@ public static function formRule($params, $files, $self) {
          $errors['payment_instrument_id'] = ts('Payment Method is a required field.');
        }
      }
@@ -728,7 +702,7 @@ index eaf5e212572..12302e95df4 100644
    }
  
    /**
-@@ -493,20 +585,24 @@ protected function submit() {
+@@ -506,20 +568,24 @@ protected function submit() {
      $this->assign('receive_date', $this->_params['receive_date']);
      $this->processBillingAddress();
      list($userName) = CRM_Contact_BAO_Contact_Location::getEmailDetails(CRM_Core_Session::singleton()->get('userID'));
@@ -764,7 +738,7 @@ index eaf5e212572..12302e95df4 100644
      $this->assign('module', 'Membership');
      $this->assign('receiptType', 'membership renewal');
      $this->_params['currencyID'] = CRM_Core_Config::singleton()->defaultCurrency;
-@@ -547,6 +643,7 @@ protected function submit() {
+@@ -560,6 +626,7 @@ protected function submit() {
          $paymentParams = array_merge($paymentParams, $contributionRecurParams);
        }
  
@@ -772,7 +746,7 @@ index eaf5e212572..12302e95df4 100644
        $result = $payment->doPayment($paymentParams);
        $this->_params = array_merge($this->_params, $result);
  
-@@ -557,69 +654,37 @@ protected function submit() {
+@@ -570,69 +637,37 @@ protected function submit() {
        $this->assign('trxn_id', $result['trxn_id']);
      }
  
@@ -858,7 +832,7 @@ index eaf5e212572..12302e95df4 100644
        //assign contribution contact id to the field expected by recordMembershipContribution
        if ($this->_contributorContactID != $this->_contactID) {
          $this->_params['contribution_contact_id'] = $this->_contributorContactID;
-@@ -647,7 +712,6 @@ protected function submit() {
+@@ -660,7 +695,6 @@ protected function submit() {
      }
  
      if (!empty($this->_params['send_receipt'])) {
@@ -866,7 +840,7 @@ index eaf5e212572..12302e95df4 100644
        $receiptFrom = $this->_params['from_email_address'];
  
        if (!empty($this->_params['payment_instrument_id'])) {
-@@ -668,7 +732,7 @@ protected function submit() {
+@@ -681,7 +715,7 @@ protected function submit() {
            $customFields["custom_{$k}"] = $field;
          }
        }
@@ -875,7 +849,7 @@ index eaf5e212572..12302e95df4 100644
        // check whether its a test drive
        if ($this->_mode == 'test') {
          $members[] = array('member_test', '=', 1, 0, 0);
-@@ -715,4 +779,129 @@ protected function submit() {
+@@ -728,4 +762,129 @@ protected function submit() {
      }
    }
  
@@ -1006,7 +980,7 @@ index eaf5e212572..12302e95df4 100644
 +
  }
 diff --git a/CRM/Price/BAO/PriceSet.php b/CRM/Price/BAO/PriceSet.php
-index 3b1dfb35d8b..9140027c095 100644
+index 7d92106f670..ca4d457b552 100644
 --- a/CRM/Price/BAO/PriceSet.php
 +++ b/CRM/Price/BAO/PriceSet.php
 @@ -561,7 +561,6 @@ public static function getOnlyPriceFieldValueID(array $priceSet) {
@@ -1026,35 +1000,7 @@ index 3b1dfb35d8b..9140027c095 100644
     */
    public static function buildPriceSet(&$form) {
      $priceSetId = $form->get('priceSetId');
-@@ -1296,6 +1293,27 @@ public static function checkPermission($sid) {
-   }
- 
-   /**
-+   *
-+   * Return the number of active price sets that include memberships.
-+   *
-+   * @return int
-+   *    e.g., 3 to indicate that there are 3 active price sets that
-+   *          use memberships
-+   */
-+  public static function getCountOfPriceSetsWithMemberships() {
-+    $query = "SELECT COUNT(DISTINCT pf.price_set_id) cnt
-+ FROM civicrm_price_field_value pfv
-+   INNER JOIN civicrm_price_field pf ON pf.id = pfv.price_field_id AND pf.is_active = 1
-+   INNER JOIN civicrm_price_set ps ON ps.id = pf.price_set_id AND ps.is_active = 1 AND ps.is_reserved = 0
-+ WHERE membership_type_id IS NOT NULL";
-+    $dao = CRM_Core_DAO::executeQuery($query);
-+    if ($dao->fetch()) {
-+      return $dao->cnt;
-+    }
-+    return 0;
-+  }
-+
-+  /**
-    * Get the sum of participant count
-    * for all fields of given price set.
-    *
-@@ -1655,7 +1673,7 @@ public static function parsePriceSetArrayFromParams($params) {
+@@ -1657,7 +1654,7 @@ public static function parsePriceSetArrayFromParams($params) {
    }
  
    /**
@@ -1063,7 +1009,7 @@ index 3b1dfb35d8b..9140027c095 100644
     *
     * @param int $priceSetId
     * @param array $lineItem
-@@ -1672,6 +1690,222 @@ public static function getNonDeductibleAmountFromPriceSet($priceSetId, $lineItem
+@@ -1674,6 +1671,236 @@ public static function getNonDeductibleAmountFromPriceSet($priceSetId, $lineItem
      }
  
      return $nonDeductibleAmount;
@@ -1189,6 +1135,20 @@ index 3b1dfb35d8b..9140027c095 100644
 +    }
 +  }
 +
++  /**
++   *
++   * Given a price set and a contact, set (in defaults), the defaults that should be used
++   * in a price set based membership renewal for this contact.
++   *
++   * This function essentially looks up for every member org that this contact is part of
++   * whether there is a price set option that could have resulted in selecting that
++   * contact's membership type for that member org.
++   *
++   * @param $defaults       Where to set the defaults
++   * @param $priceSet       Fully loaded price set to analyze
++   * @param int $contactID  the contact's Id.
++   * @return mixed          the defaults passed in as parameter
++   */
 +  public static function setPriceSetDefaultsToLastUsedValues(&$defaults, $priceSet, $contactID) {
 +
 +    // this is detailed info on how membership orgs, and the best membership type & price set field to use
@@ -1287,7 +1247,7 @@ index 3b1dfb35d8b..9140027c095 100644
  
    /**
 diff --git a/templates/CRM/Member/Form/Membership.tpl b/templates/CRM/Member/Form/Membership.tpl
-index acad1a90004..959b2180145 100644
+index 61b5cdb950c..2a31b0f7ecf 100644
 --- a/templates/CRM/Member/Form/Membership.tpl
 +++ b/templates/CRM/Member/Form/Membership.tpl
 @@ -31,7 +31,7 @@
@@ -1299,7 +1259,7 @@ index acad1a90004..959b2180145 100644
    {include file="CRM/Price/Form/PriceSet.tpl" context="standalone" extends="Membership"}
    {literal}
    <script type="text/javascript">
-@@ -603,7 +603,7 @@
+@@ -606,7 +606,7 @@
        cj( "#total_amount" ).val( '' );
        cj('#total_amount').attr("readonly", true);
  
@@ -1310,22 +1270,15 @@ index acad1a90004..959b2180145 100644
          url: dataUrl,
 diff --git a/templates/CRM/Member/Form/MembershipPriceSetCommon.tpl b/templates/CRM/Member/Form/MembershipPriceSetCommon.tpl
 new file mode 100644
-index 00000000000..6fc3a8e18cd
+index 00000000000..05e6e8a16de
 --- /dev/null
 +++ b/templates/CRM/Member/Form/MembershipPriceSetCommon.tpl
-@@ -0,0 +1,10 @@
+@@ -0,0 +1,3 @@
 +{if $priceSetId}
 +  {include file="CRM/Price/Form/PriceSet.tpl" context="standalone" extends="Membership"}
-+  <script>
-+    {if $price_set_has_new_orgs}
-+      cj('#join_date_desc').show();
-+    {else}
-+      cj('#join_date_desc').hide();
-+    {/if}
-+  </script>
 +{/if}
 diff --git a/templates/CRM/Member/Form/MembershipRenewal.tpl b/templates/CRM/Member/Form/MembershipRenewal.tpl
-index ec3f48090ec..92fefc076b2 100644
+index ec3f48090ec..5ced7206bfd 100644
 --- a/templates/CRM/Member/Form/MembershipRenewal.tpl
 +++ b/templates/CRM/Member/Form/MembershipRenewal.tpl
 @@ -23,6 +23,10 @@
@@ -1393,21 +1346,7 @@ index ec3f48090ec..92fefc076b2 100644
        <tr class="crm-member-membershiprenew-form-block-membership_status">
          <td class="label">{ts}Membership Status{/ts}</td>
          <td class="html-adjust">&nbsp;{$membershipStatus}<br/>
-@@ -88,7 +121,12 @@
-       </tr>
-       <tr class="crm-member-membershiprenew-form-block-renewal_date">
-         <td class="label">{$form.renewal_date.label}</td>
--        <td>{include file="CRM/common/jcalendar.tpl" elementName=renewal_date}</td>
-+        <td>{include file="CRM/common/jcalendar.tpl" elementName=renewal_date}
-+        {if $priceSetId}
-+        <br />
-+        <span class="description hiddenElement" id="join_date_desc">{ts}If you choose a membership type for an organization for which this contact is not member of, then this date will also be used as the 'Member Since' date{/ts}</span>
-+        {/if}
-+        </td>
-       </tr>
-       <tr id="defaultNumTerms" class="crm-member-membershiprenew-form-block-default-num_terms">
-         <td colspan="2" class="description">
-@@ -227,8 +265,63 @@
+@@ -227,8 +260,58 @@
      function adjustMembershipOrgType() {
        cj('#membershipOrgType').show();
        cj('#changeMembershipOrgType').hide();
@@ -1425,11 +1364,6 @@ index ec3f48090ec..92fefc076b2 100644
 +      var membershipTypeId = cj('#membership_type_id_1').val();
 +
 +      function showPriceSet() {
-+      {/literal}
-+        {if $price_set_has_new_orgs}{literal}
-+          cj('#join_date_desc').show();
-+        {/literal}{/if}
-+        {literal}
 +        cj('#price_set_id').val(priceSet);
 +        // unset membershiptype and org, so to avoid triggering processing on those, since we're using a price set
 +        membershipTypeOrg = cj('#membership_type_id_0').val();
@@ -1471,7 +1405,7 @@ index ec3f48090ec..92fefc076b2 100644
      function changeNumTerms() {
        cj('#changeNumTerms').show();
        cj('#defaultNumTerms').hide();
-@@ -304,5 +397,37 @@
+@@ -304,5 +387,37 @@
          cj('#record-different-contact').hide();
        }
      }
@@ -1512,10 +1446,10 @@ index ec3f48090ec..92fefc076b2 100644
 +{/if}
 diff --git a/tests/phpunit/CRM/Member/Form/MembershipPriceSetRenewalTest.php b/tests/phpunit/CRM/Member/Form/MembershipPriceSetRenewalTest.php
 new file mode 100644
-index 00000000000..d734e3aad11
+index 00000000000..bcf50845576
 --- /dev/null
 +++ b/tests/phpunit/CRM/Member/Form/MembershipPriceSetRenewalTest.php
-@@ -0,0 +1,348 @@
+@@ -0,0 +1,353 @@
 +<?php
 +/*
 + +--------------------------------------------------------------------+
@@ -1652,7 +1586,9 @@ index 00000000000..d734e3aad11
 +  public function testSubmit_RenewPickExistingAndAddNew() {
 +    $this->_contactID = $this->individualCreate();
 +
-+    $this->_mem_date = "04/23/2017";
++    $nowMinus3Months = strtotime('-3 months', time());
++    $nowPlus9Months = strtotime('+9 months', time());
++    $this->_mem_date = date("m/d/Y", $nowMinus3Months);
 +    $memberships[0] = $this->cicContactMembershipCreate(199); // CSC Full Fee (member of contact #5)
 +    $memberships[1] = $this->cicContactMembershipCreate(165); // ACCN Print (member of contact #8)
 +
@@ -1766,7 +1702,10 @@ index 00000000000..d734e3aad11
 +
 +    $expectedData1 = $this->createFlatXmlDataSet(dirname(__FILE__) . "/dataset/price_set_renewal_expected.xml")->getTable("memberships_etc");
 +    $expectedData2 = new PHPUnit_Extensions_Database_DataSet_ReplacementTable($expectedData1);
-+    $expectedData2->addFullReplacement("special-now", date("Y-m-d"));
++    $expectedData2->addSubStrReplacement("special-memyear", date("Y", $nowMinus3Months));
++    $expectedData2->addSubStrReplacement("special-now+9m", date("Y-m-d", $nowPlus9Months));
++    $expectedData2->addSubStrReplacement("special-now-3m", date("Y-m-d", $nowMinus3Months));
++    $expectedData2->addSubStrReplacement("special-now", date("Y-m-d"));
 +    $this->assertTablesEqual($expectedData2, $actualData);
 +
 +    // Use this to troubleshoot what's wrong!!!  Probably not required, but in my case, took for ever to realize, that
@@ -1865,10 +1804,10 @@ index 00000000000..d734e3aad11
 +
 +}
 diff --git a/tests/phpunit/CRM/Member/Form/MembershipRenewalTest.php b/tests/phpunit/CRM/Member/Form/MembershipRenewalTest.php
-index be1d4013594..47c74e7dcba 100644
+index d95e2804b9f..bb38976986c 100644
 --- a/tests/phpunit/CRM/Member/Form/MembershipRenewalTest.php
 +++ b/tests/phpunit/CRM/Member/Form/MembershipRenewalTest.php
-@@ -248,7 +248,7 @@ public function testSubmitRecur() {
+@@ -249,7 +249,7 @@ public function testSubmitRecur() {
        'cvv2' => '123',
        'credit_card_exp_date' => array(
          'M' => '9',
@@ -1877,7 +1816,7 @@ index be1d4013594..47c74e7dcba 100644
        ),
        'credit_card_type' => 'Visa',
        'billing_first_name' => 'Test',
-@@ -580,7 +580,7 @@ protected function getBaseSubmitParams() {
+@@ -581,7 +581,7 @@ protected function getBaseSubmitParams() {
        'cvv2' => '123',
        'credit_card_exp_date' => array(
          'M' => '9',
@@ -2823,15 +2762,16 @@ index 00000000000..2d69d507000
 +
 diff --git a/tests/phpunit/CRM/Member/Form/dataset/price_set_renewal_expected.xml b/tests/phpunit/CRM/Member/Form/dataset/price_set_renewal_expected.xml
 new file mode 100644
-index 00000000000..890d955352d
+index 00000000000..f98c7e04c74
 --- /dev/null
 +++ b/tests/phpunit/CRM/Member/Form/dataset/price_set_renewal_expected.xml
-@@ -0,0 +1,73 @@
+@@ -0,0 +1,76 @@
 +<?xml version="1.0" encoding="UTF-8" ?>
 +<!--  $Id: data.xml 43570 2012-11-09 12:03:45Z deepak $ -->
 +<dataset>
 +
-+    <memberships_etc    membership_type_id="161"                join_date="2017-04-23"      start_date="2017-01-01"         end_date="2017-12-31"
++    <!-- new membership, gets current year -->
++    <memberships_etc    membership_type_id="161"                join_date="special-now-3m"      start_date="special-memyear-01-01"         end_date="special-memyear-12-31"
 +                        mem_status_id="1"
 +
 +                        con_financial_type_id="2"               payment_instrument_id="2"   total_amount="206.85"           fee_amount="1.50"
@@ -2841,13 +2781,14 @@ index 00000000000..890d955352d
 +                        qty="1.00"                              unit_price="20.00"          line_total="20.00"
 +                        lit_financial_type_id="240"
 +
-+                        created_date="special-now"              transaction_date="2017-04-23"
++                        created_date="special-now"              transaction_date="special-now-3m"
 +                        description="Canadian Society for Chemical Engineering (CSChE) (taxable)"
 +                        amount="20.00"
 +                        fit_currency="USD"                      financial_account_id="249"  fit_status_id="1"/>
 +
 +
-+    <memberships_etc    membership_type_id="162"                join_date="2017-04-23"      start_date="2017-01-01"         end_date="2017-12-31"
++    <!-- new membership, gets current year -->
++    <memberships_etc    membership_type_id="162"                join_date="special-now-3m"      start_date="special-memyear-01-01"         end_date="special-memyear-12-31"
 +                        mem_status_id="1"
 +
 +                        con_financial_type_id="2"               payment_instrument_id="2"   total_amount="206.85"           fee_amount="1.50"
@@ -2857,14 +2798,15 @@ index 00000000000..890d955352d
 +                        qty="1.00"                              unit_price="20.00"          line_total="20.00"
 +                        lit_financial_type_id="242"
 +
-+                        created_date="special-now"              transaction_date="2017-04-23"
++                        created_date="special-now"              transaction_date="special-now-3m"
 +                        description="Canadian Society for Chemical Technology (CSCT) (taxable)"
 +                        amount="20.00"
 +
 +                        fit_currency="USD"                      financial_account_id="251"  fit_status_id="1"/>
 +
 +
-+    <memberships_etc    membership_type_id="163"                join_date="2017-04-23"      start_date="2017-04-23"         end_date="2018-04-23"
++    <!-- existing membership, simply gets extended by 1.  So because manually created to expire based on cyrrent year, will now go after current year. -->
++    <memberships_etc    membership_type_id="163"                join_date="special-now-3m"      start_date="special-now-3m"         end_date="special-now+9m"
 +                        mem_status_id="1"
 +
 +                        con_financial_type_id="2"               payment_instrument_id="2"   total_amount="206.85"           fee_amount="1.50"
@@ -2874,14 +2816,14 @@ index 00000000000..890d955352d
 +                        qty="1.00"                              unit_price="0.00"           line_total="0.00"
 +                        lit_financial_type_id="237"
 +
-+                        created_date="special-now"              transaction_date="2017-04-23"
++                        created_date="special-now"              transaction_date="special-now-3m"
 +                        description="Print and Online"
 +                        amount="0.00"
 +
 +                        fit_currency="USD"                      financial_account_id="246"  fit_status_id="1"/>
 +
 +
-+    <memberships_etc    membership_type_id="199"                join_date="2017-04-23"      start_date="2017-04-23"         end_date="2018-04-23"
++    <memberships_etc    membership_type_id="199"                join_date="special-now-3m"      start_date="special-now-3m"         end_date="special-now+9m"
 +                        mem_status_id="1"
 +
 +                        con_financial_type_id="2"               payment_instrument_id="2"   total_amount="206.85"           fee_amount="1.50"
@@ -2891,7 +2833,7 @@ index 00000000000..890d955352d
 +                        qty="1.00"                              unit_price="157.00"         line_total="157.00"
 +                        lit_financial_type_id="191"
 +
-+                        created_date="special-now"             transaction_date="2017-04-23"
++                        created_date="special-now"              transaction_date="special-now-3m"
 +                        description="CSC Full Fee (taxable)"
 +                        amount="157.00"
 +
