@@ -371,29 +371,29 @@ function _aor_civicrm_addContactMembershipNumber($contact, $commit) {
     return NULL;
   }
 
-  $lockfile = _aor_civicrm_getLockFile('aor_civicrm_addcontactmembershipnumber');
-  $fp = fopen($lockfile, "w+");
-  if (flock($fp, LOCK_EX)) {  // acquire an exclusive lock
-    Civi::log()->info($contact['id'] . ': Got lock for new membership number');
-    $nextMembershipNo = CRM_Aor_Utils::getSettings('aor_next_membership_number');
-    if ($nextMembershipNo > 499999) {
-      Civi::log()
-        ->warning('uk.co.mjwconsult.aor not creating new AoR membership number as it would cause duplicate >= 500000');
-      flock($fp, LOCK_UN);    // release the lock
-      return NULL;
-    }
-
-    $contact['external_identifier'] = $nextMembershipNo;
-    if ($commit) {
-      Civi::log()->info($contact['id'] . ': Saving new membership number');
-      $contact = civicrm_api3('Contact', 'create', $contact);
-    }
-    // Save the next available membership number
-    CRM_Aor_Utils::setSetting($nextMembershipNo + 1, 'aor_next_membership_number');
-    flock($fp, LOCK_UN);    // release the lock
-
-    return $contact;
+  while(!lock_acquire("aor_civicrm_addcontactmembershipnumber", 5)){
+	  lock_wait("aor_civicrm_addcontactmembershipnumber", 3);
   }
+  
+  Civi::log()->info($contact['id'] . ': Got lock for new membership number');
+  $nextMembershipNo = CRM_Aor_Utils::getSettings('aor_next_membership_number');
+  if ($nextMembershipNo > 499999) {
+    Civi::log()
+      ->warning('uk.co.mjwconsult.aor not creating new AoR membership number as it would cause duplicate >= 500000');
+    lock_release("aor_civicrm_addcontactmembershipnumber");    // release the lock
+    return NULL;
+  }
+
+  $contact['external_identifier'] = $nextMembershipNo;
+  if ($commit) {
+    Civi::log()->info($contact['id'] . ': Saving new membership number');
+    $contact = civicrm_api3('Contact', 'create', $contact);
+  }
+  // Save the next available membership number
+  CRM_Aor_Utils::setSetting($nextMembershipNo + 1, 'aor_next_membership_number');
+  lock_release("aor_civicrm_addcontactmembershipnumber");    // release the lock
+
+  return $contact;
 }
 
 /**
@@ -403,8 +403,8 @@ function _aor_civicrm_addContactMembershipNumber($contact, $commit) {
  * @return null
  */
 function _aor_civicrm_addContactMembershipNumberToMembership($membership) {
-  $lockFP = fopen(_aor_civicrm_getLockFile('addcontactmembershipnumbertomembership'), 'w+');
-  if (!flock($lockFP, LOCK_EX|LOCK_NB)) {
+	
+  if(!lock_acquire("addcontactmembershipnumbertomembership", 5)) {
     Civi::log()->info('Not updating membership numbers, lock in progress');
     return;
   }
@@ -417,7 +417,7 @@ function _aor_civicrm_addContactMembershipNumberToMembership($membership) {
   }
   catch (Exception $e) {
     Civi::log()->warning('Could not get contact from membership. ' . $e->getMessage());
-    _aor_civicrm_releaseLock($lockFP);
+    lock_release("addcontactmembershipnumbertomembership");
     return NULL;
   }
 
@@ -430,21 +430,25 @@ function _aor_civicrm_addContactMembershipNumberToMembership($membership) {
   _aor_civicrm_clearMembershipsMembershipNo($membership['contact_id'], $excludeId);
 
   if ($excludeId) {
-    _aor_civicrm_releaseLock($lockFP);
+    lock_release("addcontactmembershipnumbertomembership");
     return NULL;
   }
 
-  $membership[_aor_getMembershipNoCustomField()] = $contact['external_identifier'];
+  $membershipParams['id'] = $membership['id'];
+  $membershipParams['contact_id'] = $membership['contact_id'];
+  $membershipParams[_aor_getMembershipNoCustomField()] = $contact['external_identifier'];
 
   try {
-    $membership = civicrm_api3('membership', 'create', $membership);
+    Civi::log()->info('about to create/update membership');
+    $membership = civicrm_api3('Membership', 'create', $membershipParams);
   } catch (Exception $e) {
     Civi::log()
       ->info('uk.co.mjwconsult.aor: Unable to update field '. _aor_getMembershipNoCustomField() . ' for membership id: ' . (isset($membership['id']) ? $membership['id'] : NULL) . ' Error: ' . $e->getMessage());
-    _aor_civicrm_releaseLock($lockFP);
+    lock_release("addcontactmembershipnumbertomembership");
     return NULL;
   }
-  _aor_civicrm_releaseLock($lockFP);
+  
+  lock_release("addcontactmembershipnumbertomembership");
 }
 
 /**
@@ -466,7 +470,7 @@ function aor_civicrm_pageRun( &$page ) {
       $url = CRM_Utils_System::url('civicrm/contact/view', "reset=1&cid={$contactId}");
       CRM_Utils_System::redirect($url);
     }
-  }
+  }  
 }
 
 function aor_civicrm_tokens( &$tokens ) {
@@ -748,6 +752,15 @@ function aor_civicrm_links($op, $objectName, $objectId, &$links, &$mask, &$value
  * @param $cid
  */
 function _aor_civicrm_clearMembershipsMembershipNo($cid, $excludeId = NULL) {
+  static $flag = 0;
+  
+  if($flag){
+	  return;
+  }
+  else{
+	  $flag = 1;
+  }
+  
   $memberships = civicrm_api3('Membership', 'get', array('contact_id' => $cid));
   Civi::log()->info('Membership count: ' . $memberships['count']);
   if (!empty($memberships['count'])) {
@@ -759,20 +772,13 @@ function _aor_civicrm_clearMembershipsMembershipNo($cid, $excludeId = NULL) {
       else {
         Civi::log()->info($membership['id'] . ': Processing clear membership');
       }
-      foreach ($membership as $key => $value) {
-        $changed = FALSE;
-        if (substr($key, 0, strlen(_aor_getMembershipNoCustomField())) === _aor_getMembershipNoCustomField()) {
-	        Civi::log()->info($membership['id'] . ': Match on ' . $key . ' with value: ' .$value );
-          if (!empty($value)) {
-            $membership[$key] = '';
-            $changed = TRUE;
-          }
-        }
-        if ($changed) {
-          Civi::log()->info($membership['id'] . ': Updating membership');
-          civicrm_api3('Membership', 'create', $membership);
-        }
-      }
+	  
+	  $updatedmembership['contact_id'] = $membership['contact_id'];
+	  $updatedmembership['id'] = $membership['id'];	  
+	  $updatedmembership[_aor_getMembershipNoCustomField()] = '';
+		  
+	  Civi::log()->info($membership['id'] . ': Updating membership');
+	  civicrm_api3('Membership', 'create', $updatedmembership);
     }
   }
 }
@@ -795,6 +801,7 @@ function _aor_civicrm_getLatestMembership($cid) {
   try {
     $membershipTypes = civicrm_api3('MembershipType', 'get', array(
       'financial_type_id' => _aor_getMembershipFinancialTypes(),
+	  'options' => array('limit' => 0)
     ));
   }
   catch (Exception $e) {
@@ -808,7 +815,7 @@ function _aor_civicrm_getLatestMembership($cid) {
   $params['membership_type_id'] = array('IN' => $types);
 
   try {
-    $membership = civicrm_api3('membership', 'getsingle', $params);
+    $membership = civicrm_api3('Membership', 'getsingle', $params);
   }
   catch (Exception $e) {
     Civi::log()->info('uk.co.mjwconsult.aor: No membership found ' . $e->getMessage());
@@ -898,7 +905,7 @@ function _aor_is_membership($mid) {
   $params['membership_type_id'] = array('IN' => $types);
 
   try {
-    $membership = civicrm_api3('membership', 'getsingle', $params);
+    $membership = civicrm_api3('Membership', 'getsingle', $params);
   }
   catch (Exception $e) {
     return FALSE;
@@ -916,7 +923,7 @@ function _aor_is_cpd_membership($mid) {
   $params['membership_type_id'] = "CPD";
 
   try {
-    $membership = civicrm_api3('membership', 'getsingle', $params);
+    $membership = civicrm_api3('Membership', 'getsingle', $params);
   }
   catch (Exception $e) {
     return FALSE;
@@ -940,7 +947,7 @@ function _aor_is_advertiser_membership($mid) {
   $params['membership_type_id'] = array('IN' => $types);
 
   try {
-    $membership = civicrm_api3('membership', 'getsingle', $params);
+    $membership = civicrm_api3('Membership', 'getsingle', $params);
   }
   catch (Exception $e) {
     return FALSE;
