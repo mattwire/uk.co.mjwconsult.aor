@@ -13,10 +13,10 @@ function aor_filter_membership() {
     vat_cb_label.forEach(membership_cb_label);
 
     // Send receipt by default
-    var sendReceipt = CRM.$('input#send_receipt');
-    if (sendReceipt.prop('checked') === false) {
-        sendReceipt.click();
-    }
+    //var sendReceipt = CRM.$('input#send_receipt');
+    //if (sendReceipt.prop('checked') === false) {
+    //    sendReceipt.click();
+    //}
 
     function membership_cb(vat_cb) {
         if (vat_cb.prop('checked') === false) {
