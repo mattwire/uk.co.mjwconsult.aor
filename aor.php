@@ -831,7 +831,11 @@ function aor_civicrm_buildForm($formName, &$form) {
       Civi::resources()->addScriptFile('uk.co.mjwconsult.aor', 'js/address.js');
       break;
     case 'CRM_Contribute_Form_Contribution_Main':
-      Civi::resources()->addScriptFile('uk.co.mjwconsult.aor', 'js/contribution_form_main.js');
+      if ($form->_id == 5) {
+        // Membership renewal contribution page
+        Civi::resources()
+          ->addScriptFile('uk.co.mjwconsult.aor', 'js/contribution_form_5.js');
+      }
       break;
     case 'CRM_Contact_Form_Task_Email':
     case 'CRM_Contact_Form_Task_PDF':
