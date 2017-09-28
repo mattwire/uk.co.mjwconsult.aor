@@ -830,6 +830,9 @@ function aor_civicrm_buildForm($formName, &$form) {
     case 'CRM_Event_Form_ManageEvent_Location':
       Civi::resources()->addScriptFile('uk.co.mjwconsult.aor', 'js/address.js');
       break;
+    case 'CRM_Contribute_Form_Contribution_Main':
+      Civi::resources()->addScriptFile('uk.co.mjwconsult.aor', 'js/contribution_form_main.js');
+      break;
     case 'CRM_Contact_Form_Task_Email':
     case 'CRM_Contact_Form_Task_PDF':
       $pid = CRM_Utils_Request::getValue('pid', $_REQUEST);
