@@ -1,0 +1,602 @@
+diff --git a/CRM/Admin/Form/Setting/Smtp.php b/CRM/Admin/Form/Setting/Smtp.php
+index 84c87282879..e67d21f95b7 100644
+--- a/CRM/Admin/Form/Setting/Smtp.php
++++ b/CRM/Admin/Form/Setting/Smtp.php
+@@ -52,6 +52,7 @@ public function buildQuickForm() {
+     $this->addRadio('outBound_option', ts('Select Mailer'), $outBoundOption);
+ 
+     CRM_Utils_System::setTitle(ts('Settings - Outbound Mail'));
++    $this->add('Checkbox', 'allow_mail_from_logged_in_contact', ts('Allow Mail to be sent from logged in contact\'s email address'));
+     $this->add('text', 'sendmail_path', ts('Sendmail Path'));
+     $this->add('text', 'sendmail_args', ts('Sendmail Argument'));
+     $this->add('text', 'smtpServer', ts('SMTP Server'));
+@@ -79,6 +80,14 @@ public function postProcess() {
+ 
+     $formValues = $this->controller->exportValues($this->_name);
+ 
++    if (!empty($formValues['allow_mail_from_logged_in_contact'])) {
++      Civi::settings()->set('allow_mail_from_logged_in_contact', TRUE);
++    }
++    else {
++      Civi::settings()->set('allow_mail_from_logged_in_contact', FALSE);
++    }
++    unset($formValues['allow_mail_from_logged_in_contact']);
++
+     $buttonName = $this->controller->getButtonName();
+     // check if test button
+     if ($buttonName == $this->_testButtonName) {
+@@ -238,6 +247,8 @@ public function setDefaultValues() {
+     if (!$this->_defaults) {
+       $this->_defaults = array();
+ 
++      $this->_defaults['allow_mail_from_logged_in_contact'] = Civi::settings()->get('allow_mail_from_logged_in_contact');
++
+       $mailingBackend = Civi::settings()->get('mailing_backend');
+       if (!empty($mailingBackend)) {
+         $this->_defaults = $mailingBackend;
+diff --git a/CRM/Contact/Form/Domain.php b/CRM/Contact/Form/Domain.php
+index c041cef4c69..cd3d2ec7f96 100644
+--- a/CRM/Contact/Form/Domain.php
++++ b/CRM/Contact/Form/Domain.php
+@@ -118,19 +118,6 @@ public function setDefaultValues() {
+       $params['id'] = $this->_id;
+       CRM_Core_BAO_Domain::retrieve($params, $domainDefaults);
+       $this->_contactId = $domainDefaults['contact_id'];
+-      //get the default domain from email address. fix CRM-3552
+-      $optionValues = array();
+-      $grpParams['name'] = 'from_email_address';
+-      CRM_Core_OptionValue::getValues($grpParams, $optionValues);
+-      foreach ($optionValues as $Id => $value) {
+-        if ($value['is_default'] && $value['is_active']) {
+-          $this->_fromEmailId = $Id;
+-          $list = explode('"', $value['label']);
+-          $domainDefaults['email_name'] = CRM_Utils_Array::value(1, $list);
+-          $domainDefaults['email_address'] = CRM_Utils_Mail::pluckEmailFromHeader($value['label']);
+-          break;
+-        }
+-      }
+ 
+       unset($params['id']);
+       $locParams = array('contact_id' => $domainDefaults['contact_id']);
+@@ -156,9 +143,6 @@ public function setDefaultValues() {
+   public function buildQuickForm() {
+     $this->addField('name', array('label' => ts('Organization Name')), TRUE);
+     $this->addField('description', array('label' => ts('Description'), 'size' => 30));
+-    $this->add('text', 'email_name', ts('FROM Name'), CRM_Core_DAO::getAttribute('CRM_Core_DAO_Email', 'email'), TRUE);
+-    $this->add('text', 'email_address', ts('FROM Email Address'), CRM_Core_DAO::getAttribute('CRM_Core_DAO_Email', 'email'), TRUE);
+-    $this->addRule('email_address', ts('Domain Email Address must use a valid email address format (e.g. \'info@example.org\').'), 'email');
+ 
+     //build location blocks.
+     CRM_Contact_Form_Location::buildQuickForm($this);
+@@ -207,16 +191,6 @@ public static function formRule($fields) {
+       $errors = array();
+     }
+ 
+-    //fix for CRM-3552,
+-    //as we use "fromName"<emailaddresss> format for domain email.
+-    if (strpos($fields['email_name'], '"') !== FALSE) {
+-      $errors['email_name'] = ts('Double quotes are not allow in from name.');
+-    }
+-
+-    // Check for default from email address and organization (domain) name. Force them to change it.
+-    if ($fields['email_address'] == 'info@EXAMPLE.ORG') {
+-      $errors['email_address'] = ts('Please enter a valid default FROM email address for system-generated emails.');
+-    }
+     if ($fields['name'] == 'Default Domain Name') {
+       $errors['name'] = ts('Please enter the name of the organization or entity which owns this CiviCRM site.');
+     }
+@@ -275,36 +249,6 @@ public function postProcess() {
+ 
+     CRM_Core_BAO_Domain::edit($params, $this->_id);
+ 
+-    //set domain from email address, CRM-3552
+-    $emailName = '"' . $params['email_name'] . '" <' . $params['email_address'] . '>';
+-
+-    $emailParams = array(
+-      'label' => $emailName,
+-      'description' => $params['description'],
+-      'is_active' => 1,
+-      'is_default' => 1,
+-    );
+-
+-    $groupParams = array('name' => 'from_email_address');
+-
+-    //get the option value wt.
+-    if ($this->_fromEmailId) {
+-      $action = $this->_action;
+-      $emailParams['weight'] = CRM_Core_DAO::getFieldValue('CRM_Core_DAO_OptionValue', $this->_fromEmailId, 'weight');
+-    }
+-    else {
+-      //add from email address.
+-      $action = CRM_Core_Action::ADD;
+-      $grpId = CRM_Core_DAO::getFieldValue('CRM_Core_DAO_OptionGroup', 'from_email_address', 'id', 'name');
+-      $fieldValues = array('option_group_id' => $grpId);
+-      $emailParams['weight'] = CRM_Utils_Weight::getDefaultWeight('CRM_Core_DAO_OptionValue', $fieldValues);
+-    }
+-
+-    //reset default within domain.
+-    $emailParams['reset_default_for'] = array('domain_id' => CRM_Core_Config::domainID());
+-
+-    CRM_Core_OptionValue::addOptionValue($emailParams, $groupParams, $action, $this->_fromEmailId);
+-
+     CRM_Core_Session::setStatus(ts("Domain information for '%1' has been saved.", array(1 => $domain->name)), ts('Saved'), 'success');
+     $session = CRM_Core_Session::singleton();
+     $session->replaceUserContext(CRM_Utils_System::url('civicrm/admin', 'reset=1'));
+diff --git a/CRM/Contact/Form/Task/EmailCommon.php b/CRM/Contact/Form/Task/EmailCommon.php
+index 88be4a082bd..5c02761b601 100644
+--- a/CRM/Contact/Form/Task/EmailCommon.php
++++ b/CRM/Contact/Form/Task/EmailCommon.php
+@@ -44,21 +44,16 @@ class CRM_Contact_Form_Task_EmailCommon {
+   public $_toContactEmails = array();
+ 
+   /**
+-   * Generate an array of Domain email addresses.
++   * @deprecated Generate an array of Domain email addresses.
+    * @return array $domainEmails;
+    */
+   public static function domainEmails() {
+-    $domainEmails = array();
+-    $domainFrom = CRM_Core_OptionGroup::values('from_email_address');
+-    foreach (array_keys($domainFrom) as $k) {
+-      $domainEmail = $domainFrom[$k];
+-      $domainEmails[$domainEmail] = htmlspecialchars($domainEmail);
+-    }
+-    return $domainEmails;
++    Civi::log()->warning('Deprecated function, use CRM_Core_BAO_Email::domainEmails()', array('civi.tag' => 'deprecated'));
++    return CRM_Core_BAO_Email::domainEmails();
+   }
+ 
+   /**
+-   * Pre Process Form Addresses to be used in QUickfomr
++   * Pre Process Form Addresses to be used in Quickform
+    * @param CRM_Core_Form $form
+    * @param bool $bounce determine if we want to throw a status bounce.
+    */
+@@ -72,60 +67,27 @@ public static function preProcessFromAddress(&$form, $bounce = TRUE) {
+       $form->_single = TRUE;
+     }
+ 
+-    $form->_emails = $emails = array();
++    $form->_emails = array();
+ 
+     $contactID = CRM_Core_Session::singleton()->getLoggedInContactID();
+-    $fromDisplayName  = CRM_Core_Session::singleton()->getLoggedInContactDisplayName();
+-
+     $form->_contactIds = array($contactID);
+-    $contactEmails = CRM_Core_BAO_Email::allEmails($contactID);
+ 
+-    $form->_onHold = array();
++    $fromEmailValues = CRM_Core_BAO_Email::getFromEmail();
+ 
+-    foreach ($contactEmails as $emailId => $item) {
+-      $email = $item['email'];
+-      if (!$email && (count($emails) < 1)) {
+-        // set it if no emails are present at all
+-        $form->_noEmails = TRUE;
+-      }
+-      else {
+-        if ($email) {
+-          if (in_array($email, $emails)) {
+-            // CRM-3624
+-            continue;
+-          }
+-
+-          $emails[$emailId] = '"' . $fromDisplayName . '" <' . $email . '> ';
+-          $form->_onHold[$emailId] = $item['on_hold'];
+-          $form->_noEmails = FALSE;
+-        }
+-      }
+-      if (!empty($email)) {
+-        $form->_emails[$emailId] = $emails[$emailId];
+-        $emails[$emailId] .= $item['locationType'];
+-
+-        if ($item['is_primary']) {
+-          $emails[$emailId] .= ' ' . ts('(preferred)');
+-        }
+-        $emails[$emailId] = htmlspecialchars($emails[$emailId]);
+-      }
++    $form->_noEmails = FALSE;
++    if (empty($fromEmailValues)) {
++      $form->_noEmails = TRUE;
+     }
+-
+     $form->assign('noEmails', $form->_noEmails);
+ 
+     if ($bounce) {
+       if ($form->_noEmails) {
+-        CRM_Core_Error::statusBounce(ts('Your user record does not have a valid email address'));
++        CRM_Core_Error::statusBounce(ts('Your user record does not have a valid email address and no from addresses have been configured.'));
+       }
+     }
+ 
+-    // now add domain from addresses
+-    $domainEmails = self::domainEmails();
+-    foreach ($domainEmails as $domainEmail => $email) {
+-      $form->_emails[$domainEmail] = $domainEmail;
+-    }
+-    $form->_fromEmails = CRM_Utils_Array::crmArrayMerge($emails, $domainEmails);
+-    $form->_fromEmails = array_filter($form->_fromEmails);
++    $form->_emails = $fromEmailValues;
++    $form->_fromEmails = $fromEmailValues;
+     if (is_numeric(key($form->_fromEmails))) {
+       // Add signature
+       $defaultEmail = civicrm_api3('email', 'getsingle', array('id' => key($form->_fromEmails)));
+diff --git a/CRM/Contact/Form/Task/PDFLetterCommon.php b/CRM/Contact/Form/Task/PDFLetterCommon.php
+index 71df969cb3f..0b5124c9088 100644
+--- a/CRM/Contact/Form/Task/PDFLetterCommon.php
++++ b/CRM/Contact/Form/Task/PDFLetterCommon.php
+@@ -58,6 +58,7 @@ public static function getLoggingOptions() {
+    * @param CRM_Core_Form $form
+    */
+   public static function preProcess(&$form) {
++    CRM_Contact_Form_Task_EmailCommon::preProcessFromAddress($form);
+     $messageText = array();
+     $messageSubject = array();
+     $dao = new CRM_Core_BAO_MessageTemplate();
+@@ -102,6 +103,8 @@ public static function buildQuickForm(&$form) {
+       FALSE
+     );
+ 
++    $form->add('select', 'from_email_address', ts('From Email Address'), $form->_fromEmails, TRUE);
++
+     $form->add('static', 'pdf_format_header', NULL, ts('Page Format: %1', array(1 => '<span class="pdf-format-header-label"></span>')));
+     $form->addSelect('format_id', array(
+       'label' => ts('Select Format'),
+diff --git a/CRM/Contribute/Form/Task/Invoice.php b/CRM/Contribute/Form/Task/Invoice.php
+index 59e86e00156..b817c4a9a79 100644
+--- a/CRM/Contribute/Form/Task/Invoice.php
++++ b/CRM/Contribute/Form/Task/Invoice.php
+@@ -129,6 +129,7 @@ public function preProcess() {
+     $this->_selectedOutput = CRM_Utils_Request::retrieve('select', 'String', $this);
+     $this->assign('selectedOutput', $this->_selectedOutput);
+ 
++    CRM_Contact_Form_Task_EmailCommon::preProcessFromAddress($this);
+     if ($this->_selectedOutput == 'email') {
+       CRM_Utils_System::setTitle(ts('Email Invoice'));
+     }
+@@ -141,36 +142,12 @@ public function preProcess() {
+    * Build the form object.
+    */
+   public function buildQuickForm() {
+-    $session = CRM_Core_Session::singleton();
+     $this->preventAjaxSubmit();
+     if (CRM_Core_Permission::check('administer CiviCRM')) {
+       $this->assign('isAdmin', 1);
+     }
+-    $contactID = $session->get('userID');
+-    $contactEmails = CRM_Core_BAO_Email::allEmails($contactID);
+-    $emails = array();
+-    $fromDisplayName = CRM_Core_DAO::getFieldValue('CRM_Contact_DAO_Contact',
+-      $contactID, 'display_name'
+-    );
+-    foreach ($contactEmails as $emailId => $item) {
+-      $email = $item['email'];
+-      if ($email) {
+-        $emails[$emailId] = '"' . $fromDisplayName . '" <' . $email . '> ';
+-      }
+-      if (isset($emails[$emailId])) {
+-        $emails[$emailId] .= $item['locationType'];
+-        if ($item['is_primary']) {
+-          $emails[$emailId] .= ' ' . ts('(preferred)');
+-        }
+-        $emails[$emailId] = htmlspecialchars($emails[$emailId]);
+-      }
+-    }
+-    $fromEmailAddress = CRM_Core_OptionGroup::values('from_email_address');
+-    foreach ($fromEmailAddress as $key => $email) {
+-      $fromEmailAddress[$key] = htmlspecialchars($fromEmailAddress[$key]);
+-    }
+-    $fromEmail = CRM_Utils_Array::crmArrayMerge($emails, $fromEmailAddress);
+-    $this->add('select', 'from_email_address', ts('From Email Address'), array('' => '- select -') + $fromEmail);
++
++    $this->add('select', 'from_email_address', ts('From'), $this->_fromEmails, TRUE);
+     if ($this->_selectedOutput != 'email') {
+       $this->addElement('radio', 'output', NULL, ts('Email Invoice'), 'email_invoice');
+       $this->addElement('radio', 'output', NULL, ts('PDF Invoice'), 'pdf_invoice');
+@@ -477,30 +454,8 @@ public static function printPDF($contribIDs, &$params, $contactIds) {
+         'tplParams' => $tplParams,
+         'PDFFilename' => $pdfFileName,
+       );
+-      $session = CRM_Core_Session::singleton();
+-      $contactID = $session->get('userID');
+-      //CRM-16319 - we dont store in userID in case the user is doing multiple
+-      //transactions etc
+-      if (empty($contactID)) {
+-        $contactID = $session->get('transaction.userID');
+-      }
+-      // Fix Invoice email doesnot send out when completed payment using Paypal
+-      if (empty($contactID)) {
+-        $contactID = current($contactIds);
+-      }
+-      $contactEmails = CRM_Core_BAO_Email::allEmails($contactID);
+-      $emails = array();
+-      $fromDisplayName = CRM_Core_DAO::getFieldValue('CRM_Contact_DAO_Contact',
+-        $contactID, 'display_name'
+-      );
+ 
+-      foreach ($contactEmails as $emailId => $item) {
+-        $email = $item['email'];
+-        if ($email) {
+-          $emails[$emailId] = '"' . $fromDisplayName . '" <' . $email . '> ';
+-        }
+-      }
+-      $fromEmail = CRM_Utils_Array::crmArrayMerge($emails, CRM_Core_OptionGroup::values('from_email_address'));
++      $fromEmail = CRM_Core_BAO_Email::getFromEmail();
+ 
+       // from email address
+       if (isset($params['from_email_address'])) {
+diff --git a/CRM/Contribute/Form/Task/PDFLetterCommon.php b/CRM/Contribute/Form/Task/PDFLetterCommon.php
+index 87bb38225b2..17ce43a4974 100644
+--- a/CRM/Contribute/Form/Task/PDFLetterCommon.php
++++ b/CRM/Contribute/Form/Task/PDFLetterCommon.php
+@@ -23,6 +23,7 @@ public static function postProcess(&$form, $formValues = NULL) {
+       $returnProperties['email'] = $returnProperties['on_hold'] = $returnProperties['is_deceased'] = $returnProperties['do_not_email'] = 1;
+       $emailParams = array(
+         'subject' => $formValues['subject'],
++        'from' => $formValues['from_email_address'],
+       );
+       // We need display_name for emailLetter() so add to returnProperties here
+       $returnProperties['display_name'] = 1;
+@@ -372,6 +373,9 @@ public static function emailLetter($contact, $html, $is_pdf, $format = array(),
+         $emails = array_keys($emails);
+         $defaults['from'] = array_pop($emails);
+       }
++      else {
++        $defaults['from'] = $params['from'];
++      }
+       if (!empty($params['subject'])) {
+         $defaults['subject'] = $params['subject'];
+       }
+diff --git a/CRM/Core/BAO/Email.php b/CRM/Core/BAO/Email.php
+index 3bfee2724e8..3c790ac99f7 100644
+--- a/CRM/Core/BAO/Email.php
++++ b/CRM/Core/BAO/Email.php
+@@ -276,6 +276,20 @@ public static function holdEmail(&$email) {
+   }
+ 
+   /**
++   * Generate an array of Domain email addresses.
++   * @return array $domainEmails;
++   */
++  public static function domainEmails() {
++    $domainEmails = array();
++    $domainFrom = CRM_Core_OptionGroup::values('from_email_address');
++    foreach (array_keys($domainFrom) as $k) {
++      $domainEmail = $domainFrom[$k];
++      $domainEmails[$domainEmail] = htmlspecialchars($domainEmail);
++    }
++    return $domainEmails;
++  }
++
++  /**
+    * Build From Email as the combination of all the email ids of the logged in user and
+    * the domain email id
+    *
+@@ -283,22 +297,20 @@ public static function holdEmail(&$email) {
+    *   an array of email ids
+    */
+   public static function getFromEmail() {
+-    $contactID = CRM_Core_Session::singleton()->getLoggedInContactID();
+-    $fromEmailValues = array();
+-
+     // add all configured FROM email addresses
+-    $domainFrom = CRM_Core_OptionGroup::values('from_email_address');
+-    foreach (array_keys($domainFrom) as $k) {
+-      $domainEmail = $domainFrom[$k];
+-      $fromEmailValues[$domainEmail] = htmlspecialchars($domainEmail);
++    $fromEmailValues = self::domainEmails();
++
++    if (!Civi::settings()->get('allow_mail_from_logged_in_contact')) {
++      return $fromEmailValues;
+     }
+ 
+     // add logged in user's active email ids
++    $contactID = CRM_Core_Session::singleton()->getLoggedInContactID();
+     if ($contactID) {
+       $contactEmails = self::allEmails($contactID);
+-      $fromDisplayName = CRM_Core_DAO::getFieldValue('CRM_Contact_DAO_Contact', $contactID, 'display_name');
++      $fromDisplayName  = CRM_Core_Session::singleton()->getLoggedInContactDisplayName();
+ 
+-      foreach ($contactEmails as $emailVal) {
++      foreach ($contactEmails as $emailId => $emailVal) {
+         $email = trim($emailVal['email']);
+         if (!$email || $emailVal['on_hold']) {
+           continue;
+@@ -309,7 +321,7 @@ public static function getFromEmail() {
+         if (!empty($emailVal['is_primary'])) {
+           $fromEmailHtml .= ' ' . ts('(preferred)');
+         }
+-        $fromEmailValues[$fromEmail] = $fromEmailHtml;
++        $fromEmailValues[$emailId] = $fromEmailHtml;
+       }
+     }
+     return $fromEmailValues;
+diff --git a/settings/Mailing.setting.php b/settings/Mailing.setting.php
+index 1969df133ae..3d2e2c6d928 100644
+--- a/settings/Mailing.setting.php
++++ b/settings/Mailing.setting.php
+@@ -333,4 +333,17 @@
+     'description' => 'The number of emails sendable via simple mail. Make sure you understand the implications for your spam reputation and legal requirements for bulk emails before editing. As there is some risk both to your spam reputation and the products if this is misused it is a hidden setting',
+     'help_text' => 'CiviCRM forces users sending more than this number of mails to use CiviMails. CiviMails have additional precautions: not sending to contacts who do not want bulk mail, adding domain name and opt out links. You should familiarise yourself with the law relevant to you on bulk mailings if changing this setting. For the US https://en.wikipedia.org/wiki/CAN-SPAM_Act_of_2003 is a good place to start.',
+   ),
++  'allow_mail_from_logged_in_contact' => array(
++    'group_name' => 'Mailing Preferences',
++    'group' => 'mailing',
++    'name' => 'allow_mail_from_logged_in_contact',
++    'type' => 'Boolean',
++    'quick_form_type' => 'YesNo',
++    'default' => 1,
++    'title' => 'Allow mail from logged in contact',
++    'is_domain' => 1,
++    'is_contact' => 0,
++    'description' => 'Allow sending email from the logged in contact\'s email address',
++    'help_text' => 'CiviCRM allows you to send email from the domain from email addresses and the logged in contact id addresses by default. Disable this if you only want to allow the domain from addresses to be used.',
++  ),
+ );
+diff --git a/templates/CRM/Admin/Form/Setting/Smtp.tpl b/templates/CRM/Admin/Form/Setting/Smtp.tpl
+index aac17900787..672b6789f3c 100644
+--- a/templates/CRM/Admin/Form/Setting/Smtp.tpl
++++ b/templates/CRM/Admin/Form/Setting/Smtp.tpl
+@@ -31,6 +31,10 @@
+ 
+ </div>
+      <table class="form-layout-compressed">
++       <tr class="crm-smtp-form-block-allow_mail_from_logged_in_contact">
++         <td class="label">{$form.allow_mail_from_logged_in_contact.html}</td>
++         <td>{$form.allow_mail_from_logged_in_contact.label}</td>
++       </tr>
+            <tr class="crm-smtp-form-block-outBound_option">
+               <td class="label">{$form.outBound_option.label}</td>
+               <td>{$form.outBound_option.html}</td>
+diff --git a/templates/CRM/Contact/Form/Domain.hlp b/templates/CRM/Contact/Form/Domain.hlp
+index 0723bf14174..0a41cc92325 100644
+--- a/templates/CRM/Contact/Form/Domain.hlp
++++ b/templates/CRM/Contact/Form/Domain.hlp
+@@ -30,21 +30,6 @@
+ {ts 1='&#123;domain.name&#125;'}Enter the name of the organization or entity which owns this CiviCRM domain. Use the %1 token to include this value in mailing content. It is used in the default Opt-out Message.{/ts}
+ {/htxt}
+ 
+-
+-{htxt id="from-name-title"}
+-{ts}From Name{/ts}
+-{/htxt}
+-{htxt id="from-name"}
+-{ts}The FROM Name and Email Address are used when automated emails are sent from this domain (e.g. subscribe and unsubscribe confirmations...). This Name and Email Address are also used as the default 'sender' values when you create a new CiviMail Mailing.{/ts}
+-{/htxt}
+-
+-{htxt id="from-email-title"}
+-{ts}From Address{/ts}
+-{/htxt}
+-{htxt id="from-email"}
+-{ts}The FROM Name and Email Address are used when automated emails are sent from this domain (e.g. subscribe and unsubscribe confirmations...). This Name and Email Address are also used as the default 'sender' values when you create a new CiviMail Mailing.{/ts}
+-{/htxt}
+-
+ {htxt id="return-path-title"}
+ {ts}Return Path{/ts}
+ {/htxt}
+diff --git a/templates/CRM/Contact/Form/Domain.tpl b/templates/CRM/Contact/Form/Domain.tpl
+index f5619a81455..81affcc9d38 100644
+--- a/templates/CRM/Contact/Form/Domain.tpl
++++ b/templates/CRM/Contact/Form/Domain.tpl
+@@ -44,20 +44,6 @@
+         </td>
+     </tr>
+     </table>
+-  <h3>{ts}System-generated Mail Settings{/ts}</h3>
+-    <table class="form-layout-compressed">
+-    <tr>
+-      <td>
+-        {$form.email_name.label} {help id="from-name"}<br />
+-        {$form.email_name.html}
+-      </td>
+-      <td class="">
+-        {$form.email_address.label} {help id="from-email"}<br />
+-        {$form.email_address.html}
+-           <br /><span class="description">(info@example.org)</span>
+-      </td>
+-    </tr>
+-    </table>
+ 
+     <h3>{ts}Default Organization Address{/ts}</h3>
+         <div class="description">{ts 1=&#123;domain.address&#125;}CiviMail mailings must include the sending organization's address. This is done by putting the %1 token in either the body or footer of the mailing. This token may also be used in regular 'Email - send now' messages and in other Message Templates. The token is replaced by the address entered below when the message is sent.{/ts}</div>
+diff --git a/templates/CRM/Contribute/Form/Task/Invoice.tpl b/templates/CRM/Contribute/Form/Task/Invoice.tpl
+index 6c6fa9053a7..f669be6eade 100644
+--- a/templates/CRM/Contribute/Form/Task/Invoice.tpl
++++ b/templates/CRM/Contribute/Form/Task/Invoice.tpl
+@@ -40,7 +40,7 @@
+     </tr>
+   {/if}
+   <tr class="crm-email-element">
+-    <td>{$form.from_email_address.label}{$form.from_email_address.html}{help id ="id-from_email" isAdmin=$isAdmin}</td>
++    <td>{$form.from_email_address.label}{$form.from_email_address.html} {help id="id-from_email" isAdmin=$isAdmin}</td>
+   </tr>
+   <tr class="crm-email-element">
+     <td>{$form.email_comment.label}{$form.email_comment.html}</td>
+diff --git a/templates/CRM/Contribute/Form/Task/PDF.tpl b/templates/CRM/Contribute/Form/Task/PDF.tpl
+index 67d9934ef9a..eaa756d0ca6 100644
+--- a/templates/CRM/Contribute/Form/Task/PDF.tpl
++++ b/templates/CRM/Contribute/Form/Task/PDF.tpl
+@@ -36,7 +36,7 @@
+     <td>{$form.output.email_receipt.html}</td>
+   </tr>
+   <tr id="selectEmailFrom" style="display: none">
+-    <td>{$form.fromEmailAddress.label}: {$form.fromEmailAddress.html}</td>
++    <td>{$form.fromEmailAddress.label} {$form.fromEmailAddress.html} {help id="id-from_email" isAdmin=$isAdmin}</td>
+   </tr>
+   <tr>
+     <td>{$form.output.pdf_receipt.html}</td>
+diff --git a/templates/CRM/Contribute/Form/Task/PDFLetter.hlp b/templates/CRM/Contribute/Form/Task/PDFLetter.hlp
+index 187b5565aef..7f88bb12a70 100644
+--- a/templates/CRM/Contribute/Form/Task/PDFLetter.hlp
++++ b/templates/CRM/Contribute/Form/Task/PDFLetter.hlp
+@@ -39,3 +39,12 @@
+ {htxt id="id-contribution-email-print"}
+   <p>{ts}You can choose to send thank-you letters as emails to contacts who are able to receive email. If you choose to do this, you can also decide whether to only print PDF's for the remaining contacts OR generate PDF's for all.{/ts}</p>
+ {/htxt}
++{htxt id ="id-from_email"}
++  <p>{ts}Select the "FROM" Email Address for this mailing from the dropdown list. Available email addresses are configurable by users with Administer CiviCRM permission. EXAMPLE: "Client Services" &lt;clientservices@example.org&gt;{/ts}</p>
++{if $params.isAdmin}
++  {capture assign="fromConfig"}{crmURL p="civicrm/admin/options/from_email_address" q="reset=1"}{/capture}
++  <p>{ts 1=$fromConfig}Go to <a href='%1'>Administer CiviCRM &raquo; Communications &raquo; FROM Email Addresses</a> to add or edit email addresses. Make sure these email addresses are valid email accounts with your email service provider.{/ts}</p>
++{else}
++  {ts}Contact your site administrator if you need to use a "FROM" Email Address which is not in the dropdown list.{/ts}
++{/if}
++{/htxt}
+diff --git a/templates/CRM/Contribute/Form/Task/PDFLetter.tpl b/templates/CRM/Contribute/Form/Task/PDFLetter.tpl
+index 6e9a49087f6..c8cfb68c113 100644
+--- a/templates/CRM/Contribute/Form/Task/PDFLetter.tpl
++++ b/templates/CRM/Contribute/Form/Task/PDFLetter.tpl
+@@ -49,6 +49,10 @@
+         <td class="label-left">{$form.email_options.label} {help id="id-contribution-email-print"}</td>
+         <td>{$form.email_options.html}</td>
+       </tr>
++      <tr>
++        <td class="label-left">{$form.from_email_address.label} {help id="id-from_email"}</td>
++        <td>{$form.from_email_address.html}</td>
++      </tr>
+     </table>
+   </div><!-- /.crm-accordion-body -->
+ </div><!-- /.crm-accordion-wrapper -->
+diff --git a/templates/CRM/Member/Form/Membership.hlp b/templates/CRM/Member/Form/Membership.hlp
+index 5d622035786..e3d5297a2de 100644
+--- a/templates/CRM/Member/Form/Membership.hlp
++++ b/templates/CRM/Member/Form/Membership.hlp
+@@ -36,3 +36,12 @@
+     </ul>
+   {/if}
+ {/htxt}
++{htxt id ="id-from_email"}
++  <p>{ts}Select the "FROM" Email Address for this mailing from the dropdown list. Available email addresses are configurable by users with Administer CiviCRM permission. EXAMPLE: "Client Services" &lt;clientservices@example.org&gt;{/ts}</p>
++{if $params.isAdmin}
++  {capture assign="fromConfig"}{crmURL p="civicrm/admin/options/from_email_address" q="reset=1"}{/capture}
++  <p>{ts 1=$fromConfig}Go to <a href='%1'>Administer CiviCRM &raquo; Communications &raquo; FROM Email Addresses</a> to add or edit email addresses. Make sure these email addresses are valid email accounts with your email service provider.{/ts}</p>
++{else}
++  {ts}Contact your site administrator if you need to use a "FROM" Email Address which is not in the dropdown list.{/ts}
++{/if}
++{/htxt}
+diff --git a/templates/CRM/Member/Form/Membership.tpl b/templates/CRM/Member/Form/Membership.tpl
+index 61b5cdb950c..e3333143913 100644
+--- a/templates/CRM/Member/Form/Membership.tpl
++++ b/templates/CRM/Member/Form/Membership.tpl
+@@ -192,7 +192,7 @@
+         {/if}
+         <tr id="fromEmail" style="display:none;">
+           <td class="label">{$form.from_email_address.label}</td>
+-          <td>{$form.from_email_address.html}</td>
++          <td>{$form.from_email_address.html} {help id="id-from_email" isAdmin=$isAdmin}</td>
+         </tr>
+         <tr id='notice' style="display:none;">
+           <td class="label">{$form.receipt_text.label}</td>
+diff --git a/templates/CRM/Member/Form/MembershipRenewal.tpl b/templates/CRM/Member/Form/MembershipRenewal.tpl
+index d4e181d4327..758c590bef9 100644
+--- a/templates/CRM/Member/Form/MembershipRenewal.tpl
++++ b/templates/CRM/Member/Form/MembershipRenewal.tpl
+@@ -129,7 +129,7 @@
+         </tr>
+         <tr id="fromEmail">
+           <td class="label">{$form.from_email_address.label}</td>
+-          <td>{$form.from_email_address.html}</td>
++          <td>{$form.from_email_address.html} {help id="id-from_email" isAdmin=$isAdmin}</td>
+         </tr>
+         <tr id="notice" class="crm-member-membershiprenew-form-block-receipt_text_renewal">
+           <td class="label">{$form.receipt_text_renewal.label}</td>
