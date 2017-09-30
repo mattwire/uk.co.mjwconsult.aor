@@ -1,12 +1,12 @@
 diff --git a/CRM/Admin/Form/Setting/Smtp.php b/CRM/Admin/Form/Setting/Smtp.php
-index 84c87282879..e67d21f95b7 100644
+index 84c87282879..e3219e81ff3 100644
 --- a/CRM/Admin/Form/Setting/Smtp.php
 +++ b/CRM/Admin/Form/Setting/Smtp.php
 @@ -52,6 +52,7 @@ public function buildQuickForm() {
      $this->addRadio('outBound_option', ts('Select Mailer'), $outBoundOption);
  
      CRM_Utils_System::setTitle(ts('Settings - Outbound Mail'));
-+    $this->add('Checkbox', 'allow_mail_from_logged_in_contact', ts('Allow Mail to be sent from logged in contact\'s email address'));
++    $this->add('checkbox', 'allow_mail_from_logged_in_contact', ts('Allow Mail to be sent from logged in contact\'s email address'));
      $this->add('text', 'sendmail_path', ts('Sendmail Path'));
      $this->add('text', 'sendmail_args', ts('Sendmail Argument'));
      $this->add('text', 'smtpServer', ts('SMTP Server'));
