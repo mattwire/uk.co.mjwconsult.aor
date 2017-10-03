@@ -15,3 +15,6 @@ This field holds the legacy AoR membership number.  For new contacts a new membe
 
 ## Contribution pages
 When renewing memberships using contribution page 5, hide other membership types using contribution_form_5.js
+
+## Membership
+Hide non-priceset membership/renewal options on backend.

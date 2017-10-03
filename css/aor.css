@@ -1,5 +1,4 @@
 /* Hide the Membership selections and force using a price set (so we get the VAT amounts correct) */
-tr.crm-membership-form-block-membership_type_id > td > span#mem_type_id,
 tr.crm-membership-form-block-membership_type_id > td > span#totalAmountORPriceSet,
 tr.crm-membership-form-block-membership_type_id > td > span.description,
 div.custom-group-Membership

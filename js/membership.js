@@ -12,7 +12,12 @@ function aor_filter_membership() {
     ];
     vat_cb_label.forEach(membership_cb_label);
 
-    // Send receipt by default
+    // Hide the organisation dropdown as we only have one
+    CRM.$('#membership_type_id_0').hide();
+    // If we can select a priceset, hide non-priceset membership selection
+    if (CRM.$('#selectPriceSet').length) { CRM.$('span#mem_type_id').hide(); }
+
+  // Send receipt by default
     //var sendReceipt = CRM.$('input#send_receipt');
     //if (sendReceipt.prop('checked') === false) {
     //    sendReceipt.click();
