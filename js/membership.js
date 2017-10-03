@@ -16,6 +16,7 @@ function aor_filter_membership() {
     CRM.$('#membership_type_id_0').hide();
     // If we can select a priceset, hide non-priceset membership selection
     if (CRM.$('#selectPriceSet').length) { CRM.$('span#mem_type_id').hide(); }
+    CRM.$('a#hidePriceSet').hide();
 
   // Send receipt by default
     //var sendReceipt = CRM.$('input#send_receipt');
