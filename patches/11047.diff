@@ -608,6 +608,21 @@ index 304ee5ea1ef..e3ca4f8e617 100644
      <tr class="crm-contactEmail-form-block-recipient">
         <td class="label">{if $single eq false}{ts}Recipient(s){/ts}{else}{$form.to.label}{/if}</td>
         <td>
+diff --git a/templates/CRM/Contact/Form/Task/PDFLetterCommon.tpl b/templates/CRM/Contact/Form/Task/PDFLetterCommon.tpl
+index 5391f478c55..6c224af5969 100644
+--- a/templates/CRM/Contact/Form/Task/PDFLetterCommon.tpl
++++ b/templates/CRM/Contact/Form/Task/PDFLetterCommon.tpl
+@@ -35,6 +35,10 @@
+         {$form.template.html} {ts}OR{/ts} {$form.document_file.html}
+       </td>
+     </tr>
++    <tr id="fromEmail" class="crm-contactEmail-form-block-fromEmailAddress crm-email-element">
++      <td class="label">{$form.from_email_address.label}</td>
++      <td>{$form.from_email_address.html} {help id="id-from_email" file="CRM/Contact/Form/Task/Email.hlp" isAdmin=$isAdmin}</td>
++    </tr>
+     <tr>
+       <td class="label-left">{$form.subject.label}</td>
+       <td>{$form.subject.html}</td>
 diff --git a/templates/CRM/Contribute/Form/Task/Invoice.hlp b/templates/CRM/Contribute/Form/Task/Invoice.hlp
 index 6d34a053d27..4845835cab5 100644
 --- a/templates/CRM/Contribute/Form/Task/Invoice.hlp
