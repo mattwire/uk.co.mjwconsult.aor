@@ -305,8 +305,21 @@ index 71df969cb3f..0b5124c9088 100644
      $form->add('static', 'pdf_format_header', NULL, ts('Page Format: %1', array(1 => '<span class="pdf-format-header-label"></span>')));
      $form->addSelect('format_id', array(
        'label' => ts('Select Format'),
+diff --git a/CRM/Contribute/BAO/Contribution.php b/CRM/Contribute/BAO/Contribution.php
+index 8bb11a19e2d..ba4de6adeba 100644
+--- a/CRM/Contribute/BAO/Contribution.php
++++ b/CRM/Contribute/BAO/Contribution.php
+@@ -4727,7 +4727,7 @@ public static function sendMail(&$input, &$ids, $contributionID, &$values,
+    * Generate From email and from name in an array values
+    */
+   public static function generateFromEmailAndName($input, $contribution) {
+-    // Use input valuse if supplied.
++    // Use input value if supplied.
+     if (!empty($input['receipt_from_email'])) {
+       return array(CRM_Utils_array::value('receipt_from_name', $input, ''), $input['receipt_from_email']);
+     }
 diff --git a/CRM/Contribute/Form/Contribution.php b/CRM/Contribute/Form/Contribution.php
-index 5b4c153daac..701961b77c8 100644
+index eb9f6138390..7ba7ced22d0 100644
 --- a/CRM/Contribute/Form/Contribution.php
 +++ b/CRM/Contribute/Form/Contribution.php
 @@ -1697,7 +1697,7 @@ protected function submit($submittedValues, $action, $pledgePaymentID) {
@@ -429,18 +442,10 @@ index 2455d38fdec..d3572b21efd 100644
          $input['receipt_from_name'] = str_replace('"', '', $fromDetails[0]);
        }
 diff --git a/CRM/Contribute/Form/Task/PDFLetterCommon.php b/CRM/Contribute/Form/Task/PDFLetterCommon.php
-index 87bb38225b2..17ce43a4974 100644
+index 87bb38225b2..f1857f0e7e7 100644
 --- a/CRM/Contribute/Form/Task/PDFLetterCommon.php
 +++ b/CRM/Contribute/Form/Task/PDFLetterCommon.php
-@@ -23,6 +23,7 @@ public static function postProcess(&$form, $formValues = NULL) {
-       $returnProperties['email'] = $returnProperties['on_hold'] = $returnProperties['is_deceased'] = $returnProperties['do_not_email'] = 1;
-       $emailParams = array(
-         'subject' => $formValues['subject'],
-+        'from' => $formValues['from_email_address'],
-       );
-       // We need display_name for emailLetter() so add to returnProperties here
-       $returnProperties['display_name'] = 1;
-@@ -372,6 +373,9 @@ public static function emailLetter($contact, $html, $is_pdf, $format = array(),
+@@ -372,6 +372,9 @@ public static function emailLetter($contact, $html, $is_pdf, $format = array(),
          $emails = array_keys($emails);
          $defaults['from'] = array_pop($emails);
        }
@@ -451,7 +456,7 @@ index 87bb38225b2..17ce43a4974 100644
          $defaults['subject'] = $params['subject'];
        }
 diff --git a/CRM/Core/BAO/Domain.php b/CRM/Core/BAO/Domain.php
-index 5c519baf1f1..8804e21cc48 100644
+index 5c519baf1f1..85235802dee 100644
 --- a/CRM/Core/BAO/Domain.php
 +++ b/CRM/Core/BAO/Domain.php
 @@ -169,9 +169,13 @@ public static function multipleDomains() {
@@ -459,9 +464,8 @@ index 5c519baf1f1..8804e21cc48 100644
     * @throws Exception
     */
 -  public static function getNameAndEmail($skipFatal = FALSE) {
--    $fromEmailAddress = CRM_Core_OptionGroup::values('from_email_address', NULL, NULL, NULL, ' AND is_default = 1');
 +  public static function getNameAndEmail($skipFatal = FALSE, $returnString = FALSE) {
-+    $fromEmailAddress = CRM_Core_BAO_Domain::getNameAndEmail(TRUE, TRUE);
+     $fromEmailAddress = CRM_Core_OptionGroup::values('from_email_address', NULL, NULL, NULL, ' AND is_default = 1');
      if (!empty($fromEmailAddress)) {
 +      if ($returnString) {
 +        // Return a string like: "Demonstrators Anonymous" <info@example.org>
@@ -470,13 +474,16 @@ index 5c519baf1f1..8804e21cc48 100644
        foreach ($fromEmailAddress as $key => $value) {
          $email = CRM_Utils_Mail::pluckEmailFromHeader($value);
          $fromArray = explode('"', $value);
-@@ -180,15 +184,15 @@ public static function getNameAndEmail($skipFatal = FALSE) {
+@@ -180,12 +184,13 @@ public static function getNameAndEmail($skipFatal = FALSE) {
        }
        return array($fromName, $email);
      }
 -    elseif ($skipFatal) {
 -      return array('', '');
--    }
++
++    if ($skipFatal) {
++      return array(NULL, NULL);
+     }
  
 -    $url = CRM_Utils_System::url('civicrm/admin/domain',
 -      'action=update&reset=1'
@@ -485,12 +492,17 @@ index 5c519baf1f1..8804e21cc48 100644
      );
      $status = ts("There is no valid default from email address configured for the domain. You can configure here <a href='%1'>Configure From Email Address.</a>", array(1 => $url));
  
-+    if ($skipFatal) {
-+      CRM_Core_Error::statusBounce($status);
-+    }
-     CRM_Core_Error::fatal($status);
-   }
+@@ -287,8 +292,8 @@ public static function getContactList() {
  
+   /**
+    * CRM-20308 & CRM-19657
+-   * Return domain information / user information for the useage in receipts
+-   * Try default from adress then fall back to using logged in user details
++   * Return domain information / user information for the usage in receipts
++   * Try default from address then fall back to using logged in user details
+    */
+   public static function getDefaultReceiptFrom() {
+     $domain = civicrm_api3('domain', 'getsingle', array('id' => CRM_Core_Config::domainID()));
 diff --git a/CRM/Core/BAO/Email.php b/CRM/Core/BAO/Email.php
 index 3bfee2724e8..3c790ac99f7 100644
 --- a/CRM/Core/BAO/Email.php
@@ -612,10 +624,10 @@ index e6f5c984ee6..23117a3a738 100644
      if (!empty($formValues['payment_instrument_id'])) {
        $paymentInstrument = CRM_Contribute_PseudoConstant::paymentInstrument();
 diff --git a/api/v3/Mailing.php b/api/v3/Mailing.php
-index a8ee98d5f86..11860b7a20f 100644
+index 6a7e4f3d3b3..68ae067a11b 100644
 --- a/api/v3/Mailing.php
 +++ b/api/v3/Mailing.php
-@@ -151,7 +151,7 @@ function _civicrm_api3_mailing_create_spec(&$params) {
+@@ -158,7 +158,7 @@ function _civicrm_api3_mailing_create_spec(&$params) {
    $params['resubscribe_id']['api.default'] = CRM_Mailing_PseudoConstant::defaultComponent('Resubscribe', '');
    $params['unsubscribe_id']['api.default'] = CRM_Mailing_PseudoConstant::defaultComponent('Unsubscribe', '');
    $params['mailing_type']['api.default'] = 'standalone';
