@@ -7,8 +7,8 @@ require_once 'aor.civix.php';
  * @return array
  */
 function _aor_getMembershipFinancialTypes() {
-  // "Member Dues", Historical Member dues, membership inc vat, membership no vat, 6 month student extension
-  return array('IN' => array(2, 42, 72, 81, 31));
+  // "Member Dues", Historical Member dues, membership inc vat, membership no vat, 6 month student, gap, 3 month student
+  return array('IN' => array(2, 42, 72, 81, 31, 30, 32));
 }
 
 function _aor_getAdvertiserFinancialTypes() {
