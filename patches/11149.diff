@@ -1,0 +1,61 @@
+diff --git a/templates/CRM/Event/Form/Participant.tpl b/templates/CRM/Event/Form/Participant.tpl
+index 59694d4adf6..7c61b1f8c8a 100644
+--- a/templates/CRM/Event/Form/Participant.tpl
++++ b/templates/CRM/Event/Form/Participant.tpl
+@@ -287,7 +287,7 @@
+             <span class="description">{ts}Source for this registration (if applicable).{/ts}</span></td>
+           </tr>
+           {if $participantMode}
+-            <tr class="crm-participant-form-block-payment_processor_id">
++            <tr class="crm-participant-form-block-payment_processor_id payment_processor-section" style="display:none;">
+               <td class="label nowrap">{$form.payment_processor_id.label}</td>
+               <td>{$form.payment_processor_id.html}</td>
+             </tr>
+@@ -418,6 +418,7 @@
+             url: dataUrl,
+             success: function ( html ) {
+               $(".crm-event-form-fee-block", $form).html( html ).trigger('crmLoad');
++              $('.payment_processor-section').show();
+               //show event real full as well as waiting list message.
+               if ( $("#hidden_eventFullMsg", $form).val( ) ) {
+                 $( "#eventFullMsg", $form).show( ).html( $("#hidden_eventFullMsg", $form).val( ) );
+diff --git a/templates/CRM/Event/Form/Registration/Register.tpl b/templates/CRM/Event/Form/Registration/Register.tpl
+index f2c93048147..7e8122dba0d 100644
+--- a/templates/CRM/Event/Form/Registration/Register.tpl
++++ b/templates/CRM/Event/Form/Registration/Register.tpl
+@@ -140,10 +140,7 @@
+         </div>
+       </fieldset>
+     {/if}
+-
+-    {if $priceSet}
+-      {include file='CRM/Core/BillingBlockWrapper.tpl'}
+-    {/if}
++    {include file='CRM/Core/BillingBlockWrapper.tpl'}
+ 
+     <div class="crm-public-form-item crm-section custom_pre-section">
+       {include file="CRM/UF/Form/Block.tpl" fields=$customPost}
+diff --git a/templates/CRM/common/paymentBlock.tpl b/templates/CRM/common/paymentBlock.tpl
+index f509332d760..c9a78df176e 100644
+--- a/templates/CRM/common/paymentBlock.tpl
++++ b/templates/CRM/common/paymentBlock.tpl
+@@ -80,6 +80,10 @@
+     }
+     showHidePayment(isHide);
+   }
++  // If we get a validation error and the form reloads we can end up with this still showing the selected pp
++  //  but the billing section is for the first payproc.
++  CRM.$('#payment_processor_id > option:selected').each(function () {CRM.$(this).removeAttr('selected')});
++
+   skipPaymentMethod();
+ 
+   CRM.$(function($) {
+@@ -107,7 +111,7 @@
+         {capture assign='profilePathVar'}{/capture}
+       {/if}
+ 
+-      {capture assign='isBackOfficePathVar'}&is_back_office={$isBackOffice}&{/capture}
++      {capture assign='isBackOfficePathVar'}is_back_office={$isBackOffice}&{/capture}
+ 
+       var payment_instrument_id = $('#payment_instrument_id').val();
+ 
