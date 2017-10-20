@@ -543,12 +543,14 @@ function aor_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array()
 
         $participantPayments = civicrm_api3('ParticipantPayment', 'get', array(
           'participant_id' => $pid,
+          'options' => array('limit' => 0),
         ));
 
         $member = $nonmember = $total = array();
         foreach ($participantPayments['values'] as $payment) {
           $lineItems = civicrm_api3('LineItem', 'get', array(
             'contribution_id' => $payment['contribution_id'],
+            'options' => array('limit' => 0),
           ));
           $member = array(
             'qty' => NULL,
@@ -640,12 +642,14 @@ function aor_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array()
 
       $membershipPayments = civicrm_api3('MembershipPayment', 'get', array(
         'membership_id' => $mid,
+        'options' => array('limit' => 0),
       ));
 
       $member = $total = array();
       foreach ($membershipPayments['values'] as $payment) {
         $lineItems = civicrm_api3('LineItem', 'get', array(
           'contribution_id' => $payment['contribution_id'],
+          'options' => array('limit' => 0),
         ));
         $member = array(
           'qty' => NULL,
@@ -771,7 +775,10 @@ function _aor_civicrm_clearMembershipsMembershipNo($cid, $excludeId = NULL) {
 	  $flag = 1;
   }
   
-  $memberships = civicrm_api3('Membership', 'get', array('contact_id' => $cid));
+  $memberships = civicrm_api3('Membership', 'get', array(
+    'contact_id' => $cid,
+    'options' => array('limit' => 0),
+  ));
   Civi::log()->info('Membership count: ' . $memberships['count']);
   if (!empty($memberships['count'])) {
     foreach ($memberships['values'] as $membership) {
@@ -811,7 +818,7 @@ function _aor_civicrm_getLatestMembership($cid) {
   try {
     $membershipTypes = civicrm_api3('MembershipType', 'get', array(
       'financial_type_id' => _aor_getMembershipFinancialTypes(),
-	  'options' => array('limit' => 0)
+      'options' => array('limit' => 0),
     ));
   }
   catch (Exception $e) {
@@ -912,10 +919,12 @@ function _aor_is_membership($mid) {
     'api.membership_type.getsingle' => 1,
   );
 
+
   // Only get memberships with financial type "Member Dues"
   try {
     $membershipTypes = civicrm_api3('MembershipType', 'get', array(
       'financial_type_id' => _aor_getMembershipFinancialTypes(),
+      'options' => array('limit' => 0),
     ));
   }
   catch (Exception $e) {
@@ -964,6 +973,7 @@ function _aor_is_advertiser_membership($mid) {
   // Only get memberships with financial type "Member Dues"
   $membershipTypes = civicrm_api3('MembershipType', 'get', array(
     'financial_type_id' => _aor_getAdvertiserFinancialTypes(),
+    'options' => array('limit' => 0),
   ));
   foreach ($membershipTypes['values'] as $typeId => $val) {
     $types[] = $val['name'];
