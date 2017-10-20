@@ -645,7 +645,7 @@ function aor_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array()
         'options' => array('limit' => 0),
       ));
 
-      $member = $total = array();
+      $member = $total = $membership = array();
       foreach ($membershipPayments['values'] as $payment) {
         $lineItems = civicrm_api3('LineItem', 'get', array(
           'contribution_id' => $payment['contribution_id'],
@@ -709,7 +709,7 @@ function aor_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array()
         );
       }
 
-      $values[$contactId] = empty($values[$contactId]) ? $membership : $values[$contactId] + $membership;
+      $values[$contactId] = empty($values[$contactId]) ? $membership : array_merge($values[$contactId], $membership);
     }
   }
 }
