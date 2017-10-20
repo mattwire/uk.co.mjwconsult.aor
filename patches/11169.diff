@@ -1,0 +1,56 @@
+diff --git a/CRM/Member/Form/Task/PDFLetterCommon.php b/CRM/Member/Form/Task/PDFLetterCommon.php
+index 47d2dd4e675..bea13ffd3c5 100644
+--- a/CRM/Member/Form/Task/PDFLetterCommon.php
++++ b/CRM/Member/Form/Task/PDFLetterCommon.php
+@@ -66,6 +66,7 @@ public static function generateHTML($membershipIDs, $returnProperties, $skipOnHo
+       // get contact information
+       $contactId = $membership['contact_id'];
+       $params = array('contact_id' => $contactId);
++      $extraParams['contact_details'] = array('membership_id' => $membershipID);
+       //getTokenDetails is much like calling the api contact.get function - but - with some minor
+       // special handlings. It precedes the existence of the api
+       list($contacts) = CRM_Utils_Token::getTokenDetails(
+@@ -73,7 +74,7 @@ public static function generateHTML($membershipIDs, $returnProperties, $skipOnHo
+         $returnProperties,
+         $skipOnHold,
+         $skipDeceased,
+-        NULL,
++        $extraParams,
+         $messageToken,
+         'CRM_Contribution_Form_Task_PDFLetterCommon'
+       );
+diff --git a/CRM/Utils/Token.php b/CRM/Utils/Token.php
+index 7bd729b2b0c..662d8ddb92e 100644
+--- a/CRM/Utils/Token.php
++++ b/CRM/Utils/Token.php
+@@ -1206,7 +1206,20 @@ public static function getTokenDetails(
+       $params[] = array('on_hold', '=', 0, 0, 0);
+     }
+ 
++    // $extraParams is used in CRM_Contact_BAO_Utils::updateGreeting() and nowhere else!
++    //  it passes the array (contact_type, =, ...) through to filter the search.
++    // $contactExtraDetails is an array of extra parameters (eg membership_id) that can be passed through for use by custom token hooks
++    //  Anything added to the $extraParams['contact_details'] array will be included in this.
++    $contactExtraDetails = array();
+     if ($extraParams) {
++      foreach ($extraParams as $key => $value) {
++        switch ($key) {
++          case 'contact_details':
++            $contactExtraDetails = $value;
++            unset($extraParams['contact_details']);
++            break;
++        }
++      }
+       $params = array_merge($params, $extraParams);
+     }
+ 
+@@ -1237,7 +1250,9 @@ public static function getTokenDetails(
+ 
+     $details = CRM_Contact_BAO_Query::apiQuery($params, $returnProperties, NULL, NULL, 0, count($contactIDs), TRUE, FALSE, TRUE, CRM_Contact_BAO_Query::MODE_CONTACTS, NULL, TRUE);
+ 
++    // These are the parameters that will be passed through to custom hooks.
+     $contactDetails = &$details[0];
++    $contactDetails[$contactID] = array_merge($contactDetails[$contactID], $contactExtraDetails);
+ 
+     foreach ($contactIDs as $key => $contactID) {
+       if (array_key_exists($contactID, $contactDetails)) {
