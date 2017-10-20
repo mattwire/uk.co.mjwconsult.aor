@@ -675,9 +675,9 @@ function aor_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array()
         $membership = array(
           'member.name' => CRM_Utils_Array::value('membership_name', $membershipRecord),
           'member.course_name' => CRM_Utils_Array::value('custom_34', $membershipRecord),
-          'member.end_date' => CRM_Utils_Array::value('end_date', $membershipRecord),
-          'member.start_date' => CRM_Utils_Array::value('start_date', $membershipRecord),
-          'member.join_date' => CRM_Utils_Array::value('join_date', $membershipRecord),
+          'member.end_date' => CRM_Utils_Date::customFormat(CRM_Utils_Array::value('end_date', $membershipRecord)),
+          'member.start_date' => CRM_Utils_Date::customFormat(CRM_Utils_Array::value('start_date', $membershipRecord)),
+          'member.join_date' => CRM_Utils_Date::customFormat(CRM_Utils_Array::value('join_date', $membershipRecord)),
           'member.qty' => $member['qty'],
           'member.totalnetamount' => CRM_Utils_Money::format($total['line_total']),
           'member.totaltaxamount' => CRM_Utils_Money::format($total['tax_amount']),
@@ -687,9 +687,9 @@ function aor_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array()
       elseif (_aor_is_cpd_membership($mid)) {
         $membership = array(
           'cpd.course_name' => CRM_Utils_Array::value('custom_34', $membershipRecord),
-          'cpd.end_date' => CRM_Utils_Array::value('end_date', $membershipRecord),
-          'cpd.start_date' => CRM_Utils_Array::value('start_date', $membershipRecord),
-          'cpd.join_date' => CRM_Utils_Array::value('join_date', $membershipRecord),
+          'cpd.end_date' => CRM_Utils_Date::customFormat(CRM_Utils_Array::value('end_date', $membershipRecord)),
+          'cpd.start_date' => CRM_Utils_Date::customFormat(CRM_Utils_Array::value('start_date', $membershipRecord)),
+          'cpd.join_date' => CRM_Utils_Date::customFormat(CRM_Utils_Array::value('join_date', $membershipRecord)),
           'cpd.qty' => $member['qty'],
           'cpd.totalnetamount' => CRM_Utils_Money::format($total['line_total']),
           'cpd.totaltaxamount' => CRM_Utils_Money::format($total['tax_amount']),
@@ -699,9 +699,9 @@ function aor_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array()
       elseif (_aor_is_advertiser_membership($mid)) {
         $membership = array(
           'advertiser.course_name' => CRM_Utils_Array::value('custom_34', $membershipRecord),
-          'advertiser.end_date' => CRM_Utils_Array::value('end_date', $membershipRecord),
-          'advertiser.start_date' => CRM_Utils_Array::value('start_date', $membershipRecord),
-          'advertiser.join_date' => CRM_Utils_Array::value('join_date', $membershipRecord),
+          'advertiser.end_date' => CRM_Utils_Date::customFormat(CRM_Utils_Array::value('end_date', $membershipRecord)),
+          'advertiser.start_date' => CRM_Utils_Date::customFormat(CRM_Utils_Array::value('start_date', $membershipRecord)),
+          'advertiser.join_date' => CRM_Utils_Date::customFormat(CRM_Utils_Array::value('join_date', $membershipRecord)),
           'advertiser.qty' => $member['qty'],
           'advertiser.totalnetamount' => CRM_Utils_Money::format($total['line_total']),
           'advertiser.totaltaxamount' => CRM_Utils_Money::format($total['tax_amount']),
