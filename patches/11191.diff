@@ -1,0 +1,21 @@
+diff --git a/CRM/Event/Cart/BAO/EventInCart.php b/CRM/Event/Cart/BAO/EventInCart.php
+index 457b12dcac2..05872c03956 100644
+--- a/CRM/Event/Cart/BAO/EventInCart.php
++++ b/CRM/Event/Cart/BAO/EventInCart.php
+@@ -291,14 +291,14 @@ public static function get_registration_link($event_id) {
+ 
+     if ($event_in_cart) {
+       return array(
+-        'label' => "Remove from Cart",
++        'label' => ts("Remove from Cart"),
+         'path' => 'civicrm/event/remove_from_cart',
+         'query' => "reset=1&id={$event_id}",
+       );
+     }
+     else {
+       return array(
+-        'label' => "Add to Cart",
++        'label' => ts("Add to Cart"),
+         'path' => 'civicrm/event/add_to_cart',
+         'query' => "reset=1&id={$event_id}",
+       );
