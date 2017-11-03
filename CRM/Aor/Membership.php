@@ -194,13 +194,17 @@ class CRM_Aor_Membership {
       return $values;
     }
 
-    // Iterate through each valid priceset until these two values are populated.
-    $values['membership_fee_taxable_amount'] = NULL;
-    $values['membership_fee_non_taxable_amount'] = NULL;
+    // Look through each priceset for a membership fee / non-taxable amount
     foreach ($priceSets as $priceset) {
-      if ($values['membership_fee_taxable_amount'] && $values['membership_fee_non_taxable_amount']) {
+      //if ($values['membership_fee_taxable_amount'] && $values['membership_fee_non_taxable_amount']) {
+      if ($values['membership_fee_taxable_amount']) {
         // Stop looping if we found what we needed.
         break;
+      }
+      else {
+        // Reset both, as they must be populated from the same priceset
+        $values['membership_fee_taxable_amount'] = 0;
+        $values['membership_fee_non_taxable_amount'] = 0;
       }
 
       // Get price fields
