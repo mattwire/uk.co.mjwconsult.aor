@@ -1,5 +1,20 @@
+diff --git a/CRM/Activity/Form/Search.php b/CRM/Activity/Form/Search.php
+index 8f275c62aad..6bbd12db9b9 100644
+--- a/CRM/Activity/Form/Search.php
++++ b/CRM/Activity/Form/Search.php
+@@ -170,9 +170,7 @@ public function buildQuickForm() {
+         $this->addRowSelectors($rows);
+       }
+ 
+-      $permission = CRM_Core_Permission::getPermission();
+-
+-      $this->addTaskMenu(CRM_Activity_Task::permissionedTaskTitles($permission));
++      $this->addTaskMenu(CRM_Activity_Task::permissionedTaskTitles(CRM_Core_Permission::getPermission()));
+     }
+ 
+   }
 diff --git a/CRM/Activity/Task.php b/CRM/Activity/Task.php
-index dbb2e6307d3..c01d5d2f9f5 100644
+index dbb2e6307d3..bb6d86c1789 100644
 --- a/CRM/Activity/Task.php
 +++ b/CRM/Activity/Task.php
 @@ -33,28 +33,7 @@
@@ -114,7 +129,7 @@ index dbb2e6307d3..c01d5d2f9f5 100644
        }
  
        CRM_Utils_Hook::searchTasks('activity', self::$_tasks);
-@@ -143,21 +122,6 @@ public static function &tasks() {
+@@ -143,43 +122,30 @@ public static function &tasks() {
    }
  
    /**
@@ -136,13 +151,14 @@ index dbb2e6307d3..c01d5d2f9f5 100644
     * Show tasks selectively based on the permission level of the user.
     *
     * @param int $permission
-@@ -165,19 +129,19 @@ public static function &taskTitles() {
++   * @param array $params
+    *
     * @return array
     *   set of tasks that are valid for the user
     */
 -  public static function &permissionedTaskTitles($permission) {
-+  public static function permissionedTaskTitles($permission, $deleteContacts = FALSE) {
-     $tasks = array();
+-    $tasks = array();
++  public static function permissionedTaskTitles($permission, $params = array()) {
      if ($permission == CRM_Core_Permission::EDIT) {
        $tasks = self::taskTitles();
      }
@@ -158,8 +174,12 @@ index dbb2e6307d3..c01d5d2f9f5 100644
 +        $tasks[self::DELETE_ACTIVITIES] = self::$_tasks[self::DELETE_ACTIVITIES]['title'];
        }
      }
++
++    $tasks = parent::corePermissionedTaskTitles($tasks, $permission, $params);
      return $tasks;
-@@ -195,8 +159,9 @@ public static function getTask($value) {
+   }
+ 
+@@ -195,8 +161,9 @@ public static function getTask($value) {
      self::tasks();
      if (!$value || !CRM_Utils_Array::value($value, self::$_tasks)) {
        // make the print task by default
@@ -170,8 +190,22 @@ index dbb2e6307d3..c01d5d2f9f5 100644
      return array(
        self::$_tasks[$value]['class'],
        self::$_tasks[$value]['result'],
+diff --git a/CRM/Campaign/Form/Search.php b/CRM/Campaign/Form/Search.php
+index da3d9fafbcb..393e97c8e16 100644
+--- a/CRM/Campaign/Form/Search.php
++++ b/CRM/Campaign/Form/Search.php
+@@ -205,8 +205,7 @@ public function buildQuickForm() {
+         $this->addRowSelectors($rows);
+       }
+ 
+-      $permission = CRM_Core_Permission::getPermission();
+-      $allTasks = CRM_Campaign_Task::permissionedTaskTitles($permission);
++      $allTasks = CRM_Campaign_Task::permissionedTaskTitles(CRM_Core_Permission::getPermission());
+ 
+       //hack to serve right page to state machine.
+       $taskMapping = array(
 diff --git a/CRM/Campaign/Task.php b/CRM/Campaign/Task.php
-index 2b12d19e004..c8fad8b44d7 100644
+index 2b12d19e004..531b00709f2 100644
 --- a/CRM/Campaign/Task.php
 +++ b/CRM/Campaign/Task.php
 @@ -36,22 +36,7 @@
@@ -235,7 +269,7 @@ index 2b12d19e004..c8fad8b44d7 100644
            'title' => ts('Print Respondents'),
            'class' => 'CRM_Campaign_Form_Task_Print',
            'result' => FALSE,
-@@ -100,23 +85,6 @@ public static function &tasks() {
+@@ -100,34 +85,19 @@ public static function &tasks() {
    }
  
    /**
@@ -259,16 +293,21 @@ index 2b12d19e004..c8fad8b44d7 100644
     * Show tasks selectively based on the permission level
     * of the user
     *
-@@ -125,7 +93,7 @@ public static function &taskTitles() {
+    * @param int $permission
++   * @param array $params
+    *
     * @return array
     *   set of tasks that are valid for the user
     */
 -  public static function &permissionedTaskTitles($permission) {
-+  public static function permissionedTaskTitles($permission, $deleteContacts = FALSE) {
++  public static function permissionedTaskTitles($permission, $params = array()) {
      $tasks = self::taskTitles();
  
++    $tasks = parent::corePermissionedTaskTitles($tasks, $permission, $params);
      return $tasks;
-@@ -143,8 +111,8 @@ public static function &permissionedTaskTitles($permission) {
+   }
+ 
+@@ -143,8 +113,8 @@ public static function &permissionedTaskTitles($permission) {
    public static function getTask($value) {
      self::tasks();
      if (!$value || !CRM_Utils_Array::value($value, self::$_tasks)) {
@@ -279,8 +318,31 @@ index 2b12d19e004..c8fad8b44d7 100644
      }
  
      return array(
+diff --git a/CRM/Case/Form/Search.php b/CRM/Case/Form/Search.php
+index 37b0b38dbaa..d258882734a 100644
+--- a/CRM/Case/Form/Search.php
++++ b/CRM/Case/Form/Search.php
+@@ -174,15 +174,13 @@ public function buildQuickForm() {
+         $this->addRowSelectors($rows);
+       }
+ 
+-      $permission = CRM_Core_Permission::getPermission();
+-
+-      $tasks = CRM_Case_Task::permissionedTaskTitles($permission);
++      $tasks = CRM_Case_Task::permissionedTaskTitles(CRM_Core_Permission::getPermission());
+ 
+       if (!empty($this->_formValues['case_deleted'])) {
+-        unset($tasks[1]);
++        unset($tasks[CRM_Case_Task::DELETE_CASES]);
+       }
+       else {
+-        unset($tasks[4]);
++        unset($tasks[CRM_Case_Task::RESTORE_CASES]);
+       }
+ 
+       $this->addTaskMenu($tasks);
 diff --git a/CRM/Case/Task.php b/CRM/Case/Task.php
-index 5af2aaaf1c9..6b1920d20d7 100644
+index 5af2aaaf1c9..111c8fe2c77 100644
 --- a/CRM/Case/Task.php
 +++ b/CRM/Case/Task.php
 @@ -36,22 +36,7 @@
@@ -356,7 +418,7 @@ index 5af2aaaf1c9..6b1920d20d7 100644
        }
  
        CRM_Utils_Hook::searchTasks('case', self::$_tasks);
-@@ -106,32 +91,6 @@ public static function &tasks() {
+@@ -106,42 +91,16 @@ public static function &tasks() {
    }
  
    /**
@@ -389,16 +451,19 @@ index 5af2aaaf1c9..6b1920d20d7 100644
     * Show tasks selectively based on the permission level.
     * of the user
     *
-@@ -140,7 +99,7 @@ public static function &optionalTaskTitle() {
+    * @param int $permission
++   * @param array $params
+    *
     * @return array
     *   set of tasks that are valid for the user
     */
 -  public static function &permissionedTaskTitles($permission) {
-+  public static function permissionedTaskTitles($permission, $deletedContacts = FALSE) {
-     $tasks = array();
+-    $tasks = array();
++  public static function permissionedTaskTitles($permission, $params = array()) {
      if (($permission == CRM_Core_Permission::EDIT)
        || CRM_Core_Permission::check('access all cases and activities')
-@@ -150,11 +109,11 @@ public static function &permissionedTaskTitles($permission) {
+       || CRM_Core_Permission::check('access my cases and activities')
+@@ -150,13 +109,15 @@ public static function &permissionedTaskTitles($permission) {
      }
      else {
        $tasks = array(
@@ -411,8 +476,12 @@ index 5af2aaaf1c9..6b1920d20d7 100644
 +        $tasks[self::DELETE_CASES] = self::$_tasks[self::DELETE_CASES]['title'];
        }
      }
++
++    $tasks = parent::corePermissionedTaskTitles($tasks, $permission, $params);
      return $tasks;
-@@ -172,7 +131,7 @@ public static function getTask($value) {
+   }
+ 
+@@ -172,7 +133,7 @@ public static function getTask($value) {
      self::tasks();
      if (!$value || !CRM_Utils_Array::value($value, self::$_tasks)) {
        // make the print task by default
@@ -422,7 +491,7 @@ index 5af2aaaf1c9..6b1920d20d7 100644
  
      return array(
 diff --git a/CRM/Contact/BAO/Group.php b/CRM/Contact/BAO/Group.php
-index a64e698da00..979e4a78ad5 100644
+index 3fd0e073f17..a58a0a492a3 100644
 --- a/CRM/Contact/BAO/Group.php
 +++ b/CRM/Contact/BAO/Group.php
 @@ -907,7 +907,7 @@ public static function getGroupList(&$params) {
@@ -456,7 +525,7 @@ index a64e698da00..979e4a78ad5 100644
        ),
        CRM_Core_Action::UPDATE => array(
 diff --git a/CRM/Contact/BAO/Query.php b/CRM/Contact/BAO/Query.php
-index ab28ca3de95..d9494985601 100644
+index b4c5951fb6e..efe4473f608 100644
 --- a/CRM/Contact/BAO/Query.php
 +++ b/CRM/Contact/BAO/Query.php
 @@ -56,7 +56,8 @@ class CRM_Contact_BAO_Query {
@@ -484,7 +553,7 @@ index ab28ca3de95..d9494985601 100644
     *
     * @var array
 diff --git a/CRM/Contact/Form/Search.php b/CRM/Contact/Form/Search.php
-index 08a5019fd95..40b1fc9b3e7 100644
+index 08a5019fd95..a9f02b3c662 100644
 --- a/CRM/Contact/Form/Search.php
 +++ b/CRM/Contact/Form/Search.php
 @@ -201,7 +201,7 @@ public static function isSearchContext($context) {
@@ -618,25 +687,66 @@ index 08a5019fd95..40b1fc9b3e7 100644
    }
  
    /**
-@@ -328,7 +339,7 @@ public function buildTaskList() {
+@@ -326,25 +337,15 @@ public static function getModeSelect() {
+    */
+   public function buildTaskList() {
      if ($this->_context !== 'amtg') {
-       $permission = CRM_Core_Permission::getPermission();
- 
+-      $permission = CRM_Core_Permission::getPermission();
+-
 -      if ($this->_componentMode == 1 || $this->_componentMode == 7) {
+-        $this->_taskList += CRM_Contact_Task::permissionedTaskTitles($permission,
+-          CRM_Utils_Array::value('deleted_contacts', $this->_formValues)
+-        );
+-      }
+-      else {
+-        $className = $this->_modeValue['taskClassName'];
+-        $this->_taskList += $className::permissionedTaskTitles($permission, FALSE);
+-      }
+-
+-      // Only offer the "Update Smart Group" task if a smart group/saved search is already in play
+-      if (isset($this->_ssID) && $permission == CRM_Core_Permission::EDIT) {
+-        $this->_taskList += CRM_Contact_Task::optionalTaskTitle();
++      $taskParams['deletedContacts'] = FALSE;
 +      if ($this->_componentMode == CRM_Contact_BAO_Query::MODE_CONTACTS || $this->_componentMode == CRM_Contact_BAO_Query::MODE_CONTACTSRELATED) {
-         $this->_taskList += CRM_Contact_Task::permissionedTaskTitles($permission,
-           CRM_Utils_Array::value('deleted_contacts', $this->_formValues)
-         );
-@@ -360,7 +371,7 @@ public function buildQuickForm() {
-     $permission = CRM_Core_Permission::getPermission();
++        $taskParams['deletedContacts'] = CRM_Utils_Array::value('deleted_contacts', $this->_formValues);
+       }
++      $className = $this->_modeValue['taskClassName'];
++      $taskParams['ssID'] = isset($this->_ssID) ? $this->_ssID : NULL;
++      $this->_taskList += $className::permissionedTaskTitles(CRM_Core_Permission::getPermission(), $taskParams);
+     }
+ 
+-    asort($this->_taskList);
+     return $this->_taskList;
+   }
+ 
+@@ -357,24 +358,11 @@ public function buildQuickForm() {
+       // jsTree is needed for tags popup
+       ->addScriptFile('civicrm', 'packages/jquery/plugins/jstree/jquery.jstree.js', 0, 'html-header', FALSE)
+       ->addStyleFile('civicrm', 'packages/jquery/plugins/jstree/themes/default/style.css', 0, 'html-header');
+-    $permission = CRM_Core_Permission::getPermission();
++
      // some tasks.. what do we want to do with the selected contacts ?
-     $tasks = array();
+-    $tasks = array();
 -    if ($this->_componentMode == 1 || $this->_componentMode == 7) {
-+    if ($this->_componentMode == CRM_Contact_BAO_Query::MODE_CONTACTS || $this->_componentMode == CRM_Contact_BAO_Query::MODE_CONTACTSRELATED) {
-       $tasks += CRM_Contact_Task::permissionedTaskTitles($permission,
-         CRM_Utils_Array::value('deleted_contacts', $this->_formValues)
-       );
-@@ -474,7 +485,7 @@ public function buildQuickForm() {
+-      $tasks += CRM_Contact_Task::permissionedTaskTitles($permission,
+-        CRM_Utils_Array::value('deleted_contacts', $this->_formValues)
+-      );
+-    }
+-    else {
+-      $className = $this->_modeValue['taskClassName'];
+-      $tasks += $className::permissionedTaskTitles($permission, FALSE);
+-    }
++    $this->_taskList = $this->buildTaskList();
+ 
+     if (isset($this->_ssID)) {
+-      if ($permission == CRM_Core_Permission::EDIT) {
+-        $tasks = $tasks + CRM_Contact_Task::optionalTaskTitle();
+-      }
+-
+       $search_custom_id
+         = CRM_Core_DAO::getFieldValue('CRM_Contact_DAO_SavedSearch', $this->_ssID, 'search_custom_id');
+ 
+@@ -474,7 +462,7 @@ public function buildQuickForm() {
      $selectedContactIds = array();
      $qfKeyParam = CRM_Utils_Array::value('qfKey', $this->_formValues);
      // We use ajax to handle selections only if the search results component_mode is set to "contacts"
@@ -645,7 +755,7 @@ index 08a5019fd95..40b1fc9b3e7 100644
        $this->addClass('crm-ajax-selection-form');
        $qfKeyParam = "civicrm search {$qfKeyParam}";
        $selectedContactIdsArr = CRM_Core_BAO_PrevNextCache::getSelection($qfKeyParam);
-@@ -515,8 +526,8 @@ public function preProcess() {
+@@ -515,8 +503,8 @@ public function preProcess() {
      $this->_ssID = CRM_Utils_Request::retrieve('ssID', 'Positive', $this);
      $this->_sortByCharacter = CRM_Utils_Request::retrieve('sortByCharacter', 'String', $this);
      $this->_ufGroupID = CRM_Utils_Request::retrieve('id', 'Positive', $this);
@@ -656,7 +766,7 @@ index 08a5019fd95..40b1fc9b3e7 100644
  
      /**
       * set the button names
-@@ -648,9 +659,9 @@ public function preProcess() {
+@@ -648,9 +636,9 @@ public function preProcess() {
      $this->assign('id',
        CRM_Utils_Array::value('uf_group_id', $this->_formValues)
      );
@@ -812,7 +922,7 @@ index 61bed6a4829..07e64bb8712 100644
  
    /**
 diff --git a/CRM/Contact/Task.php b/CRM/Contact/Task.php
-index d5afbac86de..10f0c243611 100644
+index d5afbac86de..a19d990e687 100644
 --- a/CRM/Contact/Task.php
 +++ b/CRM/Contact/Task.php
 @@ -34,50 +34,9 @@
@@ -926,21 +1036,39 @@ index d5afbac86de..10f0c243611 100644
    }
  
    /**
-@@ -320,8 +250,8 @@ public static function &taskTitles() {
+@@ -314,16 +244,19 @@ public static function &taskTitles() {
+    * of the user
+    *
+    * @param int $permission
+-   * @param bool $deletedContacts
+-   *   Are these tasks for operating on deleted contacts?.
++   * @param array $params:
++   *             bool deletedContacts: Are these tasks for operating on deleted contacts?.
+    *
     * @return array
     *   set of tasks that are valid for the user
     */
 -  public static function &permissionedTaskTitles($permission, $deletedContacts = FALSE) {
 -    self::initTasks();
-+  public static function permissionedTaskTitles($permission, $deletedContacts = FALSE) {
++  public static function permissionedTaskTitles($permission, $params = array()) {
++    if (!isset($params['deletedContacts'])) {
++      $params['deletedContacts'] = FALSE;
++    }
 +    self::tasks();
      $tasks = array();
-     if ($deletedContacts) {
+-    if ($deletedContacts) {
++    if ($params['deletedContacts']) {
        if (CRM_Core_Permission::check('access deleted contacts')) {
-@@ -357,58 +287,18 @@ public static function &permissionedTaskTitles($permission, $deletedContacts = F
-   }
+         $tasks[self::RESTORE] = self::$_tasks[self::RESTORE]['title'];
+         if (CRM_Core_Permission::check('delete contacts')) {
+@@ -353,19 +286,8 @@ public static function &permissionedTaskTitles($permission, $deletedContacts = F
+         $tasks[self::CREATE_MAILING] = self::$_tasks[self::CREATE_MAILING]['title'];
+       }
+     }
+-    return $tasks;
+-  }
  
-   /**
+-  /**
 -   * These tasks get added based on the context the user is in.
 -   *
 -   * @return array
@@ -950,12 +1078,11 @@ index d5afbac86de..10f0c243611 100644
 -    $tasks = array(
 -      self::SAVE_SEARCH_UPDATE => self::$_tasks[self::SAVE_SEARCH_UPDATE]['title'],
 -    );
--    return $tasks;
--  }
--
--  /**
-    * @param $value
-    *
++    $tasks = parent::corePermissionedTaskTitles($tasks, $permission, $params);
+     return $tasks;
+   }
+ 
+@@ -375,40 +297,13 @@ public static function &optionalTaskTitle() {
     * @return array
     */
    public static function getTask($value) {
@@ -998,8 +1125,27 @@ index d5afbac86de..10f0c243611 100644
    }
  
  }
+diff --git a/CRM/Contribute/Form/Search.php b/CRM/Contribute/Form/Search.php
+index b0174523f6b..2d3d66570d1 100644
+--- a/CRM/Contribute/Form/Search.php
++++ b/CRM/Contribute/Form/Search.php
+@@ -197,11 +197,11 @@ public function buildQuickForm() {
+       $permission = CRM_Core_Permission::getPermission();
+ 
+       $queryParams = $this->get('queryParams');
+-      $softCreditFiltering = FALSE;
++      $taskParams['softCreditFiltering'] = FALSE;
+       if (!empty($queryParams)) {
+-        $softCreditFiltering = CRM_Contribute_BAO_Query::isSoftCreditOptionEnabled($queryParams);
++        $taskParams['softCreditFiltering'] = CRM_Contribute_BAO_Query::isSoftCreditOptionEnabled($queryParams);
+       }
+-      $tasks = CRM_Contribute_Task::permissionedTaskTitles($permission, $softCreditFiltering);
++      $tasks = CRM_Contribute_Task::permissionedTaskTitles($permission, $taskParams);
+       $this->addTaskMenu($tasks);
+     }
+ 
 diff --git a/CRM/Contribute/Task.php b/CRM/Contribute/Task.php
-index 9c4f20c5ad5..89ab544cd84 100644
+index 9c4f20c5ad5..c9bfabe0bb6 100644
 --- a/CRM/Contribute/Task.php
 +++ b/CRM/Contribute/Task.php
 @@ -36,22 +36,7 @@
@@ -1111,7 +1257,7 @@ index 9c4f20c5ad5..89ab544cd84 100644
        }
  
        CRM_Utils_Hook::searchTasks('contribution', self::$_tasks);
-@@ -140,22 +125,6 @@ public static function tasks() {
+@@ -140,34 +125,21 @@ public static function tasks() {
    }
  
    /**
@@ -1134,16 +1280,25 @@ index 9c4f20c5ad5..89ab544cd84 100644
     * Show tasks selectively based on the permission level
     * of the user
     *
-@@ -166,7 +135,7 @@ public static function &taskTitles() {
+    * @param int $permission
+    *
+-   * @param bool $softCreditFiltering
++   * @param array $params:
++   *              bool softCreditFiltering: derived from CRM_Contribute_BAO_Query::isSoftCreditOptionEnabled
+    *
     * @return array
     *   set of tasks that are valid for the user
     */
 -  public static function &permissionedTaskTitles($permission, $softCreditFiltering = FALSE) {
-+  public static function permissionedTaskTitles($permission, $softCreditFiltering = FALSE) {
-     $tasks = array();
+-    $tasks = array();
++  public static function permissionedTaskTitles($permission, $params = array()) {
++    if (!isset($params['softCreditFiltering'])) {
++      $params['softCreditFiltering'] = FALSE;
++    }
      if (($permission == CRM_Core_Permission::EDIT)
        || CRM_Core_Permission::check('edit contributions')
-@@ -175,18 +144,18 @@ public static function &permissionedTaskTitles($permission, $softCreditFiltering
+     ) {
+@@ -175,19 +147,21 @@ public static function &permissionedTaskTitles($permission, $softCreditFiltering
      }
      else {
        $tasks = array(
@@ -1161,13 +1316,17 @@ index 9c4f20c5ad5..89ab544cd84 100644
 +        $tasks[self::DELETE_CONTRIBUTIONS] = self::$_tasks[self::DELETE_CONTRIBUTIONS]['title'];
        }
      }
-     if ($softCreditFiltering) {
+-    if ($softCreditFiltering) {
 -      unset($tasks[4], $tasks[7]);
++    if ($params['softCreditFiltering']) {
 +      unset($tasks[self::BATCH_CONTRIBUTIONS], $tasks[self::PDF_RECEIPT]);
      }
++
++    $tasks = parent::corePermissionedTaskTitles($tasks, $permission, $params);
      return $tasks;
    }
-@@ -204,17 +173,9 @@ public static function getTask($value) {
+ 
+@@ -204,17 +178,9 @@ public static function getTask($value) {
      self::tasks();
      if (!$value || !CRM_Utils_Array::value($value, self::$_tasks)) {
        // make the print task by default
@@ -1215,10 +1374,10 @@ index b9de5379701..143a7ab49d3 100644
     * @param array $tables
 diff --git a/CRM/Core/Task.php b/CRM/Core/Task.php
 new file mode 100644
-index 00000000000..6e93659b32a
+index 00000000000..4ef94042e02
 --- /dev/null
 +++ b/CRM/Core/Task.php
-@@ -0,0 +1,232 @@
+@@ -0,0 +1,241 @@
 +<?php
 +/*
 + +--------------------------------------------------------------------+
@@ -1332,7 +1491,12 @@ index 00000000000..6e93659b32a
 +    // Pledge tasks
 +    DELETE_PLEDGES = 66,
 +    PRINT_PLEDGES = 67,
-+    EXPORT_PLEDGES = 68;
++    EXPORT_PLEDGES = 68,
++    // Grant Tasks
++    DELETE_GRANTS = 1,
++    PRINT_GRANTS = 2,
++    EXPORT_GRANTS = 3,
++    UPDATE_GRANTS = 4;
 +
 +  /**
 +   * The task array
@@ -1340,13 +1504,6 @@ index 00000000000..6e93659b32a
 +   * @var array
 +   */
 +  static $_tasks = NULL;
-+
-+  /**
-+   * The optional task array
-+   *
-+   * @var array
-+   */
-+  static $_optionalTasks = NULL;
 +
 +  abstract public static function tasks();
 +
@@ -1365,9 +1522,6 @@ index 00000000000..6e93659b32a
 +      $titles[$id] = $value['title'];
 +    }
 +
-+    // hack unset update saved search
-+    unset($titles[self::SAVE_SEARCH_UPDATE]);
-+
 +    if (!CRM_Utils_Mail::validOutBoundMail()) {
 +      unset($titles[self::EMAIL_CONTACTS]);
 +      unset($titles[self::CREATE_MAILING]);
@@ -1385,26 +1539,40 @@ index 00000000000..6e93659b32a
 +  /**
 +   * Show tasks selectively based on the permission level
 +   * of the user
++   * This function should be call parent::corePermissionedTaskTitles
 +   *
 +   * @param int $permission
-+   * @param bool $deletedContacts
-+   *   Are these tasks for operating on deleted contacts?.
++   * @param array $params
++   *             "ssID: Saved Search ID": If !empty we are in saved search context
 +   *
 +   * @return array
 +   *   set of tasks that are valid for the user
 +   */
-+  abstract public static function permissionedTaskTitles($permission, $deletedContacts = FALSE);
++  abstract public static function permissionedTaskTitles($permission, $params);
 +
 +  /**
-+   * These tasks get added based on the context the user is in.
++   * Show tasks selectively based on the permission level
++   * of the user
++   * This function should be called by permissionedTaskTitles in children
++   *
++   * @param int $permission
++   * @param array $params
++   *             "ssID: Saved Search ID": If !empty we are in saved search context
++   * @param array $tasks: The array of tasks generated by permissionedTaskTitles
 +   *
 +   * @return array
-+   *   the set of optional tasks for a group of contacts
++   *   set of tasks that are valid for the user
 +   */
-+  public static function optionalTaskTitle() {
-+    $tasks = array(
-+      self::SAVE_SEARCH_UPDATE => self::$_tasks[self::SAVE_SEARCH_UPDATE]['title'],
-+    );
++  public static function corePermissionedTaskTitles($tasks, $permission, $params) {
++    // Only offer the "Update Smart Group" task if a smart group/saved search is already in play and we have edit permissions
++    if (!empty($params['ssID']) && ($permission == CRM_Core_Permission::EDIT)) {
++      $tasks[self::SAVE_SEARCH_UPDATE] = self::$_tasks[self::SAVE_SEARCH_UPDATE]['title'];
++    }
++    else {
++      unset($tasks[self::SAVE_SEARCH_UPDATE]);
++    }
++
++    asort($tasks);
 +    return $tasks;
 +  }
 +
@@ -1451,8 +1619,29 @@ index 00000000000..6e93659b32a
 +  }
 +
 +}
+diff --git a/CRM/Event/Form/Search.php b/CRM/Event/Form/Search.php
+index 45521031359..5ac763c5230 100644
+--- a/CRM/Event/Form/Search.php
++++ b/CRM/Event/Form/Search.php
+@@ -229,14 +229,10 @@ public function buildQuickForm() {
+       $this->assign('participantCount', $participantCount);
+       $this->assign('lineItems', $lineItems);
+ 
+-      $permission = CRM_Core_Permission::getPermission();
++      $taskParams['ssID'] = isset($this->_ssID) ? $this->_ssID : NULL;
++      $tasks = CRM_Event_Task::permissionedTaskTitles(CRM_Core_Permission::getPermission(), $taskParams);
+ 
+-      $tasks = CRM_Event_Task::permissionedTaskTitles($permission);
+       if (isset($this->_ssID)) {
+-        if ($permission == CRM_Core_Permission::EDIT) {
+-          $tasks = $tasks + CRM_Event_Task::optionalTaskTitle();
+-        }
+-
+         $savedSearchValues = array(
+           'id' => $this->_ssID,
+           'name' => CRM_Contact_BAO_SavedSearch::getName($this->_ssID, 'title'),
 diff --git a/CRM/Event/Form/Task.php b/CRM/Event/Form/Task.php
-index 231089cfc53..a06174dc300 100644
+index 231089cfc53..6151248be2d 100644
 --- a/CRM/Event/Form/Task.php
 +++ b/CRM/Event/Form/Task.php
 @@ -88,8 +88,11 @@ public static function preProcessCommon(&$form, $useTable = FALSE) {
@@ -1462,7 +1651,7 @@ index 231089cfc53..a06174dc300 100644
 -    $eventTasks = CRM_Event_Task::tasks();
 -    $form->assign('taskName', $eventTasks[$form->_task]);
 +    $tasks = CRM_Event_Task::permissionedTaskTitles(CRM_Core_Permission::getPermission());
-+    if (!array_key_exists($form->_task, CRM_Event_Task::permissionedTaskTitles(CRM_Core_Permission::getPermission()))) {
++    if (!array_key_exists($form->_task, $tasks)) {
 +      CRM_Core_Error::statusBounce(ts('You do not have permission to access this page.'));
 +    }
 +    $form->assign('taskName', $tasks[$form->_task]);
@@ -1470,7 +1659,7 @@ index 231089cfc53..a06174dc300 100644
      $ids = array();
      if ($values['radio_ts'] == 'ts_sel') {
 diff --git a/CRM/Event/Task.php b/CRM/Event/Task.php
-index 4bc04bf7bd5..2c11434aad2 100644
+index 4bc04bf7bd5..df261a0c553 100644
 --- a/CRM/Event/Task.php
 +++ b/CRM/Event/Task.php
 @@ -38,26 +38,7 @@
@@ -1587,7 +1776,7 @@ index 4bc04bf7bd5..2c11434aad2 100644
            'title' => ts('Group - add contacts'),
            'class' => 'CRM_Event_Form_Task_AddToGroup',
            'result' => FALSE,
-@@ -139,61 +120,32 @@ public static function &tasks() {
+@@ -139,62 +120,31 @@ public static function &tasks() {
  
        //CRM-4418, check for delete
        if (!CRM_Core_Permission::check('delete in CiviEvent')) {
@@ -1644,18 +1833,18 @@ index 4bc04bf7bd5..2c11434aad2 100644
     * of the user
     *
     * @param int $permission
-+   * @param bool $deletedContacts
-+   *   Are these tasks for operating on deleted contacts?.
++   * @param array $params
     *
     * @return array
     *   set of tasks that are valid for the user
     */
 -  public static function &permissionedTaskTitles($permission) {
-+  public static function permissionedTaskTitles($permission, $deletedContacts = FALSE) {
-     $tasks = array();
+-    $tasks = array();
++  public static function permissionedTaskTitles($permission, $params = array()) {
      if (($permission == CRM_Core_Permission::EDIT)
        || CRM_Core_Permission::check('edit event participants')
-@@ -202,13 +154,13 @@ public static function &permissionedTaskTitles($permission) {
+     ) {
+@@ -202,15 +152,17 @@ public static function &permissionedTaskTitles($permission) {
      }
      else {
        $tasks = array(
@@ -1671,7 +1860,11 @@ index 4bc04bf7bd5..2c11434aad2 100644
 +        $tasks[self::DELETE_EVENTS] = self::$_tasks[self::DELETE_EVENTS]['title'];
        }
      }
++
++    $tasks = parent::corePermissionedTaskTitles($tasks, $permission, $params);
      return $tasks;
+   }
+ 
 @@ -227,13 +179,9 @@ public static function getTask($value) {
      self::tasks();
      if (!$value || !CRM_Utils_Array::value($value, self::$_tasks)) {
@@ -1680,6 +1873,182 @@ index 4bc04bf7bd5..2c11434aad2 100644
 +      $value = self::PRINT_EVENTS;
      }
 -    asort(self::$_tasks);
+-    return array(
+-      self::$_tasks[$value]['class'],
+-      self::$_tasks[$value]['result'],
+-    );
++    return parent::getTask($value);
+   }
+ 
+ }
+diff --git a/CRM/Grant/Form/Search.php b/CRM/Grant/Form/Search.php
+index 3a1400ad756..cb8b1fd651a 100644
+--- a/CRM/Grant/Form/Search.php
++++ b/CRM/Grant/Form/Search.php
+@@ -170,9 +170,7 @@ public function buildQuickForm() {
+         $this->addRowSelectors($rows);
+       }
+ 
+-      $permission = CRM_Core_Permission::getPermission();
+-
+-      $this->addTaskMenu(CRM_Grant_Task::permissionedTaskTitles($permission));
++      $this->addTaskMenu(CRM_Grant_Task::permissionedTaskTitles(CRM_Core_Permission::getPermission()));
+     }
+ 
+   }
+diff --git a/CRM/Grant/Form/Task.php b/CRM/Grant/Form/Task.php
+index c7700b34b94..1b882e88b93 100644
+--- a/CRM/Grant/Form/Task.php
++++ b/CRM/Grant/Form/Task.php
+@@ -88,8 +88,11 @@ public static function preProcessCommon(&$form, $useTable = FALSE) {
+     $values = $form->controller->exportValues('Search');
+ 
+     $form->_task = $values['task'];
+-    $grantTasks = CRM_Grant_Task::tasks();
+-    $form->assign('taskName', $grantTasks[$form->_task]);
++    $tasks = CRM_Grant_Task::tasks();
++    if (!array_key_exists($form->_task, $tasks)) {
++      CRM_Core_Error::statusBounce(ts('You do not have permission to access this page.'));
++    }
++    $form->assign('taskName', $tasks[$form->_task]);
+ 
+     $ids = array();
+     if ($values['radio_ts'] == 'ts_sel') {
+diff --git a/CRM/Grant/Task.php b/CRM/Grant/Task.php
+index 290f52ab78f..9fd64dbeee6 100644
+--- a/CRM/Grant/Task.php
++++ b/CRM/Grant/Task.php
+@@ -38,22 +38,7 @@
+  * used by the search forms
+  *
+  */
+-class CRM_Grant_Task {
+-  const DELETE_GRANTS = 1, PRINT_GRANTS = 2, EXPORT_GRANTS = 3, UPDATE_GRANTS = 4;
+-
+-  /**
+-   * The task array
+-   *
+-   * @var array
+-   */
+-  static $_tasks = NULL;
+-
+-  /**
+-   * The optional task array
+-   *
+-   * @var array
+-   */
+-  static $_optionalTasks = NULL;
++class CRM_Grant_Task extends CRM_Core_Task {
+ 
+   /**
+    * These tasks are the core set of tasks that the user can perform
+@@ -62,20 +47,20 @@ class CRM_Grant_Task {
+    * @return array
+    *   the set of tasks for a group of contacts
+    */
+-  public static function &tasks() {
++  public static function tasks() {
+     if (!(self::$_tasks)) {
+       self::$_tasks = array(
+-        1 => array(
++        self::DELETE_GRANTS => array(
+           'title' => ts('Delete grants'),
+           'class' => 'CRM_Grant_Form_Task_Delete',
+           'result' => FALSE,
+         ),
+-        2 => array(
++        self::PRINT_GRANTS => array(
+           'title' => ts('Print selected rows'),
+           'class' => 'CRM_Grant_Form_Task_Print',
+           'result' => FALSE,
+         ),
+-        3 => array(
++        self::EXPORT_GRANTS => array(
+           'title' => ts('Export grants'),
+           'class' => array(
+             'CRM_Export_Form_Select',
+@@ -83,7 +68,7 @@ public static function &tasks() {
+           ),
+           'result' => FALSE,
+         ),
+-        4 => array(
++        self::UPDATE_GRANTS => array(
+           'title' => ts('Update grants'),
+           'class' => 'CRM_Grant_Form_Task_Update',
+           'result' => FALSE,
+@@ -91,7 +76,7 @@ public static function &tasks() {
+       );
+ 
+       if (!CRM_Core_Permission::check('delete in CiviGrant')) {
+-        unset(self::$_tasks[1]);
++        unset(self::$_tasks[self::DELETE_GRANTS]);
+       }
+ 
+       CRM_Utils_Hook::searchTasks('grant', self::$_tasks);
+@@ -102,31 +87,16 @@ public static function &tasks() {
+   }
+ 
+   /**
+-   * These tasks are the core set of task titles
+-   *
+-   * @return array
+-   *   the set of task titles
+-   */
+-  public static function &taskTitles() {
+-    self::tasks();
+-    $titles = array();
+-    foreach (self::$_tasks as $id => $value) {
+-      $titles[$id] = $value['title'];
+-    }
+-    return $titles;
+-  }
+-
+-  /**
+    * Show tasks selectively based on the permission level
+    * of the user
+    *
+    * @param int $permission
++   * @param array $params
+    *
+    * @return array
+    *   set of tasks that are valid for the user
+    */
+-  public static function &permissionedTaskTitles($permission) {
+-    $tasks = array();
++  public static function permissionedTaskTitles($permission, $params = array()) {
+     if (($permission == CRM_Core_Permission::EDIT)
+       || CRM_Core_Permission::check('edit grants')
+     ) {
+@@ -134,13 +104,15 @@ public static function &permissionedTaskTitles($permission) {
+     }
+     else {
+       $tasks = array(
+-        3 => self::$_tasks[3]['title'],
++        self::EXPORT_GRANTS => self::$_tasks[self::EXPORT_GRANTS]['title'],
+       );
+       //CRM-4418,
+       if (CRM_Core_Permission::check('delete in CiviGrant')) {
+-        $tasks[1] = self::$_tasks[1]['title'];
++        $tasks[self::DELETE_GRANTS] = self::$_tasks[self::DELETE_GRANTS]['title'];
+       }
+     }
++
++    $tasks = parent::corePermissionedTaskTitles($tasks, $permission, $params);
+     return $tasks;
+   }
+ 
+@@ -154,14 +126,12 @@ public static function &permissionedTaskTitles($permission) {
+    */
+   public static function getTask($value) {
+     self::tasks();
+-    if (!$value || !CRM_Utils_Array::value($value, self::$_tasks)) {
+-      // make the print task by default
+-      $value = 2;
++
++    if (!CRM_Utils_Array::value($value, self::$_tasks)) {
++      // make it the print task by default
++      $value = self::PRINT_GRANTS;
+     }
 -    return array(
 -      self::$_tasks[$value]['class'],
 -      self::$_tasks[$value]['result'],
@@ -1732,7 +2101,7 @@ index 9210ddbead2..077e779fc90 100644
          'parentsOnly' => 'Integer',
          'showOrgInfo' => 'Boolean',
 diff --git a/CRM/Mailing/Task.php b/CRM/Mailing/Task.php
-index 6bdec4b22a4..89fec648894 100644
+index 6bdec4b22a4..b14d4a2b74a 100644
 --- a/CRM/Mailing/Task.php
 +++ b/CRM/Mailing/Task.php
 @@ -36,20 +36,7 @@
@@ -1770,7 +2139,7 @@ index 6bdec4b22a4..89fec648894 100644
            'title' => ts('Print Mailing Recipients'),
            'class' => 'CRM_Mailing_Form_Task_Print',
            'result' => FALSE,
-@@ -76,17 +63,6 @@ public static function &tasks() {
+@@ -76,28 +63,20 @@ public static function &tasks() {
    }
  
    /**
@@ -1788,16 +2157,24 @@ index 6bdec4b22a4..89fec648894 100644
     * Show tasks selectively based on the permission level
     * of the user.
     *
-@@ -95,7 +71,7 @@ public static function &taskTitles() {
+    * @param int $permission
++   * @param array $params
+    *
     * @return array
     *   set of tasks that are valid for the user
     */
 -  public static function &permissionedTaskTitles($permission) {
-+  public static function permissionedTaskTitles($permission, $deleteContacts = FALSE) {
-     $task = array();
-     return $task;
+-    $task = array();
+-    return $task;
++  public static function permissionedTaskTitles($permission, $params = array()) {
++    $tasks = array();
++
++    $tasks = parent::corePermissionedTaskTitles($tasks, $permission, $params);
++    return $tasks;
    }
-@@ -113,8 +89,9 @@ public static function getTask($value) {
+ 
+   /**
+@@ -113,8 +92,9 @@ public static function getTask($value) {
      self::tasks();
      if (!$value || !CRM_Utils_Array::value($value, self::$_tasks)) {
        // make the print task by default
@@ -1808,8 +2185,23 @@ index 6bdec4b22a4..89fec648894 100644
      return array(
        self::$_tasks[$value]['class'],
        self::$_tasks[$value]['result'],
+diff --git a/CRM/Member/Form/Search.php b/CRM/Member/Form/Search.php
+index e21293931a3..d08bb993c51 100644
+--- a/CRM/Member/Form/Search.php
++++ b/CRM/Member/Form/Search.php
+@@ -163,9 +163,7 @@ public function buildQuickForm() {
+         $this->addRowSelectors($rows);
+       }
+ 
+-      $permission = CRM_Core_Permission::getPermission();
+-
+-      $this->addTaskMenu(CRM_Member_Task::permissionedTaskTitles($permission));
++      $this->addTaskMenu(CRM_Member_Task::permissionedTaskTitles(CRM_Core_Permission::getPermission()));
+     }
+ 
+   }
 diff --git a/CRM/Member/Form/Task.php b/CRM/Member/Form/Task.php
-index 7624334c19e..7dfa160ab53 100644
+index 7624334c19e..6c56017486f 100644
 --- a/CRM/Member/Form/Task.php
 +++ b/CRM/Member/Form/Task.php
 @@ -95,8 +95,11 @@ public static function preProcessCommon(&$form, $useTable = FALSE) {
@@ -1819,7 +2211,7 @@ index 7624334c19e..7dfa160ab53 100644
 -    $memberTasks = CRM_Member_Task::tasks();
 -    $form->assign('taskName', $memberTasks[$form->_task]);
 +    $tasks = CRM_Member_Task::permissionedTaskTitles(CRM_Core_Permission::getPermission());
-+    if (!array_key_exists($form->_task, CRM_Member_Task::permissionedTaskTitles(CRM_Core_Permission::getPermission()))) {
++    if (!array_key_exists($form->_task, $tasks)) {
 +      CRM_Core_Error::statusBounce(ts('You do not have permission to access this page.'));
 +    }
 +    $form->assign('taskName', $tasks[$form->_task]);
@@ -1827,7 +2219,7 @@ index 7624334c19e..7dfa160ab53 100644
      $ids = array();
      if ($values['radio_ts'] == 'ts_sel') {
 diff --git a/CRM/Member/Task.php b/CRM/Member/Task.php
-index 7f2da7b08e7..6da42c315bb 100644
+index 7f2da7b08e7..f208c2b5953 100644
 --- a/CRM/Member/Task.php
 +++ b/CRM/Member/Task.php
 @@ -39,22 +39,7 @@
@@ -1953,22 +2345,22 @@ index 7f2da7b08e7..6da42c315bb 100644
    }
  
    /**
-@@ -148,11 +138,13 @@ public static function &taskTitles() {
+@@ -148,12 +138,12 @@ public static function &taskTitles() {
     * of the user
     *
     * @param int $permission
-+   * @param bool $deletedContacts
-+   *   Are these tasks for operating on deleted contacts?.
++   * @param array $params
     *
     * @return array
     *   set of tasks that are valid for the user
     */
 -  public static function &permissionedTaskTitles($permission) {
-+  public static function permissionedTaskTitles($permission, $deletedContacts = FALSE) {
-     $tasks = array();
+-    $tasks = array();
++  public static function permissionedTaskTitles($permission, $params = array()) {
      if (($permission == CRM_Core_Permission::EDIT)
        || CRM_Core_Permission::check('edit memberships')
-@@ -161,12 +153,12 @@ public static function &permissionedTaskTitles($permission) {
+     ) {
+@@ -161,14 +151,16 @@ public static function &permissionedTaskTitles($permission) {
      }
      else {
        $tasks = array(
@@ -1983,7 +2375,11 @@ index 7f2da7b08e7..6da42c315bb 100644
 +        $tasks[self::DELETE_MEMBERS] = self::$_tasks[self::DELETE_MEMBERS]['title'];
        }
      }
++
++    $tasks = parent::corePermissionedTaskTitles($tasks, $permission, $params);
      return $tasks;
+   }
+ 
 @@ -184,13 +176,10 @@ public static function &permissionedTaskTitles($permission) {
    public static function getTask($value) {
      self::tasks();
@@ -2001,8 +2397,23 @@ index 7f2da7b08e7..6da42c315bb 100644
    }
  
  }
+diff --git a/CRM/Pledge/Form/Search.php b/CRM/Pledge/Form/Search.php
+index e0e23cfa061..c5a4c8608b7 100644
+--- a/CRM/Pledge/Form/Search.php
++++ b/CRM/Pledge/Form/Search.php
+@@ -155,9 +155,7 @@ public function buildQuickForm() {
+         $this->addRowSelectors($rows);
+       }
+ 
+-      $permission = CRM_Core_Permission::getPermission();
+-
+-      $this->addTaskMenu(CRM_Pledge_Task::permissionedTaskTitles($permission));
++      $this->addTaskMenu(CRM_Pledge_Task::permissionedTaskTitles(CRM_Core_Permission::getPermission()));
+     }
+ 
+   }
 diff --git a/CRM/Pledge/Task.php b/CRM/Pledge/Task.php
-index feeaf107344..dab2820ac7c 100644
+index feeaf107344..7d3baf8ddcf 100644
 --- a/CRM/Pledge/Task.php
 +++ b/CRM/Pledge/Task.php
 @@ -34,22 +34,7 @@
@@ -2063,7 +2474,7 @@ index feeaf107344..dab2820ac7c 100644
        }
  
        CRM_Utils_Hook::searchTasks('pledge', self::$_tasks);
-@@ -94,32 +79,6 @@ public static function &tasks() {
+@@ -94,42 +79,16 @@ public static function &tasks() {
    }
  
    /**
@@ -2096,16 +2507,19 @@ index feeaf107344..dab2820ac7c 100644
     * Show tasks selectively based on the permission level
     * of the user
     *
-@@ -128,7 +87,7 @@ public static function &optionalTaskTitle() {
+    * @param int $permission
++   * @param array $params
+    *
     * @return array
     *   set of tasks that are valid for the user
     */
 -  public static function &permissionedTaskTitles($permission) {
-+  public static function permissionedTaskTitles($permission, $deleteContact = FALSE) {
-     $tasks = array();
+-    $tasks = array();
++  public static function permissionedTaskTitles($permission, $params = array()) {
      if (($permission == CRM_Core_Permission::EDIT)
        || CRM_Core_Permission::check('edit pledges')
-@@ -137,11 +96,11 @@ public static function &permissionedTaskTitles($permission) {
+     ) {
+@@ -137,13 +96,15 @@ public static function &permissionedTaskTitles($permission) {
      }
      else {
        $tasks = array(
@@ -2118,18 +2532,31 @@ index feeaf107344..dab2820ac7c 100644
 +        $tasks[self::DELETE_PLEDGES] = self::$_tasks[self::DELETE_PLEDGES]['title'];
        }
      }
++
++    $tasks = parent::corePermissionedTaskTitles($tasks, $permission, $params);
      return $tasks;
-@@ -160,8 +119,9 @@ public static function getTask($value) {
+   }
+ 
+@@ -158,14 +119,12 @@ public static function &permissionedTaskTitles($permission) {
+    */
+   public static function getTask($value) {
      self::tasks();
-     if (!$value || !CRM_Utils_Array::value($value, self::$_tasks)) {
-       // make the print task by default
+-    if (!$value || !CRM_Utils_Array::value($value, self::$_tasks)) {
+-      // make the print task by default
 -      $value = 2;
++
++    if (!CRM_Utils_Array::value($value, self::$_tasks)) {
++      // make it the print task by default
 +      $value = self::PRINT_PLEDGES;
      }
-+
-     return array(
-       self::$_tasks[$value]['class'],
-       self::$_tasks[$value]['result'],
+-    return array(
+-      self::$_tasks[$value]['class'],
+-      self::$_tasks[$value]['result'],
+-    );
++    return parent::getTask($value);
+   }
+ 
+ }
 diff --git a/templates/CRM/Group/Form/Search.tpl b/templates/CRM/Group/Form/Search.tpl
 index 5a59dd1a908..64af53742cd 100644
 --- a/templates/CRM/Group/Form/Search.tpl
