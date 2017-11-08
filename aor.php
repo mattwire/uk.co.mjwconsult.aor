@@ -589,6 +589,23 @@ function aor_civicrm_buildForm($formName, &$form) {
 }
 
 /**
+ * Implements hook_civicrm_postProcess().
+ *
+ * @param string $formName
+ * @param CRM_Core_Form $form
+ */
+function aor_civicrm_postProcess($formName, &$form) {
+  switch ($formName) {
+    case 'CRM_Member_Form_Task_PDFLetter':
+      $memberIds = $form->getVar('_memberIds');
+      if (!empty($memberIds) && is_array($memberIds) && count($memberIds) > 0) {
+        CRM_Aor_Membership::setContributionThankyouDate($memberIds);
+      }
+
+  }
+}
+
+/**
  * Get the CPD Tutor custom group
  */
 $_cpdtutor_custom_group = NULL; // static, global variable

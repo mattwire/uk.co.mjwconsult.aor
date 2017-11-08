@@ -254,4 +254,35 @@ class CRM_Aor_Membership {
     $values['total_amount'] = $values['taxable_amount'] + $values['tax_amount'] + $values['non_taxable_amount'];
     return $values;
   }
+
+  /**
+   * For each member Id, get all the contributions and set the "thankyou_sent" field to Datetime.now for those contributions
+   * @param $memberIds: values are civi membership IDs
+   *
+   */
+  public static function setContributionThankyouDate($memberIds) {
+    $nowDate = date('YmdHis');
+    foreach ($memberIds as $membershipId) {
+      // Get contributions for membership
+      $contributionResult = civicrm_api3('MembershipPayment', 'get', array(
+        'membership_id.id' => $membershipId,
+        'options' => array('limit' => 0),
+      ));
+      if (empty($contributionResult['count'])) {
+        continue;
+      }
+      // Set thankyou_sent to "now" for associated contributions
+      foreach ($contributionResult['values'] as $key => $values) {
+        if (empty($values['contribution_id'])) {
+          continue;
+        }
+        // Update receipt/thankyou dates
+        $contributionParams = array(
+          'id' => $values['contribution_id'],
+          'thankyou_date' => $nowDate,
+        );
+        $result = civicrm_api3('Contribution', 'create', $contributionParams);
+      }
+    }
+  }
 }
