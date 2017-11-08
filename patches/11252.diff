@@ -1,0 +1,46 @@
+diff --git a/CRM/Activity/Form/ActivityLinks.php b/CRM/Activity/Form/ActivityLinks.php
+index d06ba2db637..7e414babed9 100644
+--- a/CRM/Activity/Form/ActivityLinks.php
++++ b/CRM/Activity/Form/ActivityLinks.php
+@@ -78,8 +78,19 @@ public static function commonBuildQuickForm($self) {
+         }
+         // Check for existence of a mobile phone and ! do not SMS privacy setting
+         $mobileTypeID = CRM_Core_PseudoConstant::getKey('CRM_Core_BAO_Phone', 'phone_type_id', 'Mobile');
+-        list($name, $phone, $doNotSMS) = CRM_Contact_BAO_Contact_Location::getPhoneDetails($contactId, $mobileTypeID);
+-        if (!$doNotSMS && $phone) {
++        try {
++          $phone = civicrm_api3('Phone', 'getsingle', array(
++            'return' => array("contact_id.do_not_sms", "phone"),
++            'phone_type_id' => $mobileTypeID,
++            'contact_id' => $contactId,
++            'options' => array('limit' => 1, 'sort' => "is_primary DESC"),
++          ));
++        }
++        catch (CiviCRM_API3_Exception $e) {
++          // No mobile number found
++          continue;
++        }
++        if (!$phone['contact_id.do_not_sms'] && $phone['phone']) {
+           $url = 'civicrm/activity/sms/add';
+         }
+         else {
+diff --git a/CRM/Contact/BAO/Contact/Location.php b/CRM/Contact/BAO/Contact/Location.php
+index 7405537b444..d9539c54b1b 100644
+--- a/CRM/Contact/BAO/Contact/Location.php
++++ b/CRM/Contact/BAO/Contact/Location.php
+@@ -73,6 +73,7 @@ public static function getEmailDetails($id, $isPrimary = TRUE, $locationTypeID =
+   }
+ 
+   /**
++   * @deprecated Not used anywhere, use the Phone API instead
+    * Get the sms number and display name of a contact.
+    *
+    * @param int $id
+@@ -84,6 +85,7 @@ public static function getEmailDetails($id, $isPrimary = TRUE, $locationTypeID =
+    *   tuple of display_name and sms if found, or (null,null)
+    */
+   public static function getPhoneDetails($id, $type = NULL) {
++    Civi::log()->warning('Deprecated function CRM_Contact_BAO_Contact_Location::getPhoneDetails, use Phone.get API instead', array('civi.tag' => 'deprecated'));
+     if (!$id) {
+       return array(NULL, NULL);
+     }

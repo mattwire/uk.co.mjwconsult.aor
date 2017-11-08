@@ -123,7 +123,7 @@ index 47d2dd4e675..4becbc6b014 100644
          'CRM_Contribution_Form_Task_PDFLetterCommon'
        );
 diff --git a/CRM/Utils/Token.php b/CRM/Utils/Token.php
-index 7bd729b2b0c..80259d4d966 100644
+index 7bd729b2b0c..2f8837f5cac 100644
 --- a/CRM/Utils/Token.php
 +++ b/CRM/Utils/Token.php
 @@ -1206,7 +1206,20 @@ public static function getTokenDetails(
@@ -147,7 +147,7 @@ index 7bd729b2b0c..80259d4d966 100644
        $params = array_merge($params, $extraParams);
      }
  
-@@ -1237,9 +1250,12 @@ public static function getTokenDetails(
+@@ -1237,9 +1250,14 @@ public static function getTokenDetails(
  
      $details = CRM_Contact_BAO_Query::apiQuery($params, $returnProperties, NULL, NULL, 0, count($contactIDs), TRUE, FALSE, TRUE, CRM_Contact_BAO_Query::MODE_CONTACTS, NULL, TRUE);
  
@@ -156,7 +156,9 @@ index 7bd729b2b0c..80259d4d966 100644
  
      foreach ($contactIDs as $key => $contactID) {
 +      // Merge in extra details that were passed in for use in custom hooks
-+      $contactDetails[$contactID] = array_merge($contactDetails[$contactID], $contactExtraDetails[$contactID]);
++      foreach ($contactExtraDetails[$contactID] as $extraDetailKey => $extraDetailVal) {
++        $contactDetails[$contactID][$extraDetailKey] = $extraDetailVal;
++      }
        if (array_key_exists($contactID, $contactDetails)) {
          if (!empty($contactDetails[$contactID]['preferred_communication_method'])
          ) {
