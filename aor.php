@@ -142,8 +142,12 @@ function aor_civicrm_alterContent(  &$content, $context, $tplName, &$object ) {
     $template = CRM_Core_Smarty::singleton();
     $content .= $template->fetch('CRM/aor/membership.js.tpl');
   }
-
-  if ($object instanceof CRM_Contact_Page_View_CustomData) {
+  elseif (($object instanceof CRM_Member_Form_Task_PDFLetter)
+         || ($object instanceof CRM_Member_Form_Task_Email)) {
+    $template = CRM_Core_Smarty::singleton();
+    $content .= $template->fetch('CRM/aor/member_email_letter.tpl');
+  }
+  elseif ($object instanceof CRM_Contact_Page_View_CustomData) {
     $customGroup = cpdtutor_get_custom_group();
     if ($object->_groupId == $customGroup['id']) {
       // We are viewing CPD Tutor information
@@ -559,7 +563,6 @@ function _aor_civicrm_clearMembershipsMembershipNo($cid, $excludeId = NULL) {
 }
 
 function aor_civicrm_buildForm($formName, &$form) {
-  $bob =1;
   switch ($formName) {
     case 'CRM_Event_Form_ManageEvent_Location':
       Civi::resources()->addScriptFile('uk.co.mjwconsult.aor', 'js/address.js');
@@ -585,6 +588,10 @@ function aor_civicrm_buildForm($formName, &$form) {
       $defaults['mid'] = $mid;
       $form->setDefaults($defaults);
       break;
+    case 'CRM_Member_Form_Task_PDFLetter':
+    case 'CRM_Member_Form_Task_Email':
+      $form->add('checkbox', 'thankyou_update', ts('Update thank-you dates for contributions linked to these memberships'), FALSE);
+      break;
   }
 }
 
@@ -597,9 +604,13 @@ function aor_civicrm_buildForm($formName, &$form) {
 function aor_civicrm_postProcess($formName, &$form) {
   switch ($formName) {
     case 'CRM_Member_Form_Task_PDFLetter':
-      $memberIds = $form->getVar('_memberIds');
-      if (!empty($memberIds) && is_array($memberIds) && count($memberIds) > 0) {
-        CRM_Aor_Membership::setContributionThankyouDate($memberIds);
+    case 'CRM_Member_Form_Task_Email':
+      $values = $form->_submitValues;
+      if (!empty($values['thankyou_update']) && !isset($values['_qf_PDFLetter_submit_preview'])) {
+        $memberIds = $form->getVar('_memberIds');
+        if (!empty($memberIds) && is_array($memberIds) && count($memberIds) > 0) {
+          CRM_Aor_Membership::setContributionThankyouDate($memberIds);
+        }
       }
 
   }

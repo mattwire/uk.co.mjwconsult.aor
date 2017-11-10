@@ -19,8 +19,9 @@ This field holds the legacy AoR membership number.  For new contacts a new membe
 
 ## Membership
 
-* Hide non-priceset membership/renewal options on backend.
-* When printing membership PDF letters, update the "Thankyou Sent" field for the related contributions to "now".
+* Hide non-priceset membership/renewal options on backend. 
+* When printing PDF letters or sending emails, a checkbox allows you to update the 
+"Thankyou Sent" field for the related contributions to "now". 
 
 ## Tokens
 The following tokens are available:
