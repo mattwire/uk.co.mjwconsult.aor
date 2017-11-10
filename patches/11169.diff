@@ -26,7 +26,7 @@ index a591d350f76..b8bbeb60f72 100644
          'CRM_Activity_BAO_Activity'
        );
 diff --git a/CRM/Contact/Form/Task/EmailCommon.php b/CRM/Contact/Form/Task/EmailCommon.php
-index 88be4a082bd..5957b59ece5 100644
+index 88be4a082bd..3b1eaaeaf0f 100644
 --- a/CRM/Contact/Form/Task/EmailCommon.php
 +++ b/CRM/Contact/Form/Task/EmailCommon.php
 @@ -212,24 +212,13 @@ public static function buildQuickForm(&$form) {
@@ -69,23 +69,34 @@ index 88be4a082bd..5957b59ece5 100644
      foreach ($form->_contactIds as $key => $contactId) {
        // if we dont have details on this contactID, we should ignore
        // potentially this is due to the contact not wanting to receive email
-@@ -495,6 +486,7 @@ public static function submit(&$form, $formValues) {
+@@ -495,6 +486,9 @@ public static function submit(&$form, $formValues) {
          $details = $form->_contactDetails[$contactId];
          $details['email'] = $email;
          unset($details['email_id']);
-+        $details += $extraParams['contact_details'][$contactId];
++        if (!empty($extraParams['contact_details'][$contactId])) {
++          $details += $extraParams['contact_details'][$contactId];
++        }
          $formattedContactDetails[] = $details;
        }
      }
 diff --git a/CRM/Member/Form/Task.php b/CRM/Member/Form/Task.php
-index 7624334c19e..f4ffc04fb56 100644
+index 7624334c19e..1a32f4c4102 100644
 --- a/CRM/Member/Form/Task.php
 +++ b/CRM/Member/Form/Task.php
-@@ -161,6 +161,18 @@ public function setContactIDs() {
-     );
+@@ -162,6 +162,28 @@ public function setContactIDs() {
    }
  
+   /**
++   * Given an array of membership IDs, set 'membership_id' for each contact in extraParams.
++   *   This allows for membership tokens to be looked up later as the membership_id is available.
++   * @param array $memberIds
++   *
++   * @return array
++   */
 +  public static function setExtraTokenDetails($memberIds) {
++    if (empty($memberIds)) {
++      return array();
++    }
 +    $extraParams = array();
 +    $memberships = CRM_Utils_Token::getMembershipTokenDetails($memberIds);
 +    foreach ($memberIds as $membershipId) {
@@ -97,9 +108,10 @@ index 7624334c19e..f4ffc04fb56 100644
 +    return $extraParams;
 +  }
 +
-   /**
++  /**
     * Simple shell that derived classes can call to add buttons to.
     * the form with a customized title for the main Submit
+    *
 diff --git a/CRM/Member/Form/Task/PDFLetterCommon.php b/CRM/Member/Form/Task/PDFLetterCommon.php
 index 47d2dd4e675..4becbc6b014 100644
 --- a/CRM/Member/Form/Task/PDFLetterCommon.php
