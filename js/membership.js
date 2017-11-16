@@ -13,12 +13,28 @@ function aor_filter_membership() {
     vat_cb_label.forEach(membership_cb_label);
 
     // Hide the organisation dropdown as we only have one
-    CRM.$('#membership_type_id_0').hide();
+    CRM.$('#membership_type_id_0').hide();	
+
     // If we can select a priceset, hide non-priceset membership selection
-    if (CRM.$('#selectPriceSet').length) { CRM.$('span#mem_type_id').hide(); }
+    if (CRM.$('#selectPriceSet').length){
+        CRM.$('span#mem_type_id').hide();
+        // Handler to set membership type - which ensures custom fields get saved on membership creation
+        CRM.$('#Membership').submit(function(){
+            var data;			
+            CRM.$("#Membership input[type=radio]:checked").each(function(){
+                if(data = CRM.$(this).data('priceFieldValues')){
+                    if(data.hasOwnProperty(CRM.$(this).val()) && data[CRM.$(this).val()].hasOwnProperty('membership_type_id')){
+                        CRM.$('#membership_type_id_1 option[value="' + data[CRM.$(this).val()].membership_type_id + '"]').prop('selected', true);
+                        return false;
+                    }
+                }
+            });
+        });
+    }
+	
     CRM.$('a#hidePriceSet').hide();
 
-  // Send receipt by default
+    // Send receipt by default
     //var sendReceipt = CRM.$('input#send_receipt');
     //if (sendReceipt.prop('checked') === false) {
     //    sendReceipt.click();
