@@ -1,12 +1,13 @@
 CRM.$(function() {
-  forceNonVatableAmount();
   hideNonCheckedMembershipOptions();
+  forceNonVatableAmount();
 });
 
 function forceNonVatableAmount() {
-  CRM.$('#price_40_106').prop('checked', true);
-  CRM.$('#price_40_106').hide();
+  CRM.$('#price_40_106').prop('checked', false);
+  CRM.$('#price_40_106').trigger('click');
   CRM.$('div.label label:contains("Non Vatable")').hide();
+  CRM.$('#price_40_106').hide();
 }
 
 function hideNonCheckedMembershipOptions() {
