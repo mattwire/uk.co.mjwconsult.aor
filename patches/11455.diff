@@ -1,0 +1,58 @@
+diff --git a/CRM/Contribute/Form/Contribution.php b/CRM/Contribute/Form/Contribution.php
+index 04310298e83..89bb290064e 100644
+--- a/CRM/Contribute/Form/Contribution.php
++++ b/CRM/Contribute/Form/Contribution.php
+@@ -1324,6 +1324,12 @@ public function testSubmit($params, $action, $creditCardMode = NULL) {
+       ));
+       $this->_id = $params['id'];
+       $this->_values = $existingContribution;
++      if (CRM_Contribute_BAO_Contribution::checkContributeSettings('invoicing')) {
++        $this->_values['tax_amount'] = civicrm_api3('contribution', 'getvalue', array(
++          'id' => $params['id'],
++          'return' => 'tax_amount',
++        ));
++      }
+     }
+     else {
+       $existingContribution = array();
+@@ -1522,7 +1528,11 @@ protected function submit($submittedValues, $action, $pledgePaymentID) {
+     }
+ 
+     if (!isset($submittedValues['total_amount'])) {
+-      $submittedValues['total_amount'] = CRM_Utils_Array::value('total_amount', $this->_values) - CRM_Utils_Array::value('tax_amount', $this->_values);
++      $submittedValues['total_amount'] = CRM_Utils_Array::value('total_amount', $this->_values);
++      // Avoid tax amount deduction on edit form and keep it original, because this will lead to error described in CRM-20676
++      if (!$this->_id) {
++        $submittedValues['total_amount'] -= CRM_Utils_Array::value('tax_amount', $this->_values, 0);
++      }
+     }
+     $this->assign('lineItem', !empty($lineItem) && !$isQuickConfig ? $lineItem : FALSE);
+ 
+diff --git a/tests/phpunit/CRM/Contribute/Form/ContributionTest.php b/tests/phpunit/CRM/Contribute/Form/ContributionTest.php
+index 747b5b481f7..68d96949e56 100644
+--- a/tests/phpunit/CRM/Contribute/Form/ContributionTest.php
++++ b/tests/phpunit/CRM/Contribute/Form/ContributionTest.php
+@@ -1088,6 +1088,23 @@ public function testSubmitSaleTax() {
+     $lineItem = $this->callAPISuccessGetSingle('LineItem', array('contribution_id' => $contribution['id']));
+     $this->assertEquals(100, $lineItem['line_total']);
+     $this->assertEquals(10, $lineItem['tax_amount']);
++
++    // CRM-20423: Upon simple submit of 'Edit Contribution' form ensure that total amount is same
++    $form->testSubmit(array(
++        'id' => $contribution['id'],
++        'financial_type_id' => 3,
++        'receive_date' => '04/21/2015',
++        'receive_date_time' => '11:27PM',
++        'contact_id' => $this->_individualId,
++        'payment_instrument_id' => array_search('Check', $this->paymentInstruments),
++        'contribution_status_id' => 1,
++      ),
++      CRM_Core_Action::UPDATE
++    );
++
++    $contribution = $this->callAPISuccessGetSingle('Contribution', array('contact_id' => $this->_individualId));
++    // Check if total amount is unchanged
++    $this->assertEquals(110, $contribution['total_amount']);
+   }
+ 
+   /**
